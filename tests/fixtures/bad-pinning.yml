@@ -1,0 +1,23 @@
+# FIXTURE: Schlechtes Beispiel – mutable Tags statt SHA-Pinning
+# check_pinning.py soll hier mit Exit 1 fehlschlagen
+
+name: Bad – Unpinnde Actions
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4           # ← PROBLEM: mutable Tag
+      - uses: actions/setup-python@main     # ← PROBLEM: Branch-Referenz
+      - uses: actions/setup-node@latest     # ← PROBLEM: @latest
+      - uses: some-org/some-action          # ← PROBLEM: kein @ überhaupt
+
+      - name: Build
+        run: echo "Build"

@@ -1,0 +1,49 @@
+name: Self-Test (Dogfooding)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+
+  # ── Bash-Tests ────────────────────────────────────────────────────────────
+  unit-tests:
+    name: 'Unit Tests'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - run: bash tests/test_checks.sh
+
+  # ── Dieses Repo gegen eigene Regeln prüfen ────────────────────────────────
+  self-check-prt:
+    name: 'Self-Check: pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - run: bash scripts/check_prt.sh .
+
+  self-check-pinning:
+    name: 'Self-Check: Action SHA-Pinning'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - run: bash scripts/check_pinning.sh .
+
+  self-check-permissions:
+    name: 'Self-Check: Workflow-Permissions'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - run: bash scripts/check_permissions.sh .

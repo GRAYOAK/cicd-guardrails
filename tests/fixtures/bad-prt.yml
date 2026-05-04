@@ -1,0 +1,23 @@
+# FIXTURE: Schlechtes Beispiel – pull_request_target mit Fork-Checkout
+# check_prt.py soll hier mit Exit 1 fehlschlagen
+
+name: Bad – pull_request_target mit Fork-Code
+
+on:
+  pull_request_target:       # ← PROBLEM: läuft mit Base-Repo-Secrets
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}   # ← KRITISCH: Fork-Code!
+          # Kombiniert mit pull_request_target = klassischer PPE-Angriffspfad
+
+      - name: Build
+        run: echo "Build läuft mit Fork-Code und Base-Repo-Secrets"

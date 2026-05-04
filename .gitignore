@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Tests
+.pytest_cache/
+pytest-cache-files-*/
+
+# gitleaks (wird zur Laufzeit heruntergeladen)
+gitleaks
+gitleaks.tar.gz
+
+# macOS
+.DS_Store
+
+# Editoren
+.vscode/
+.idea/
