@@ -31,6 +31,13 @@ on:
           check-branch-protection
         type: string
         default: ''
+    secrets:
+      admin-token:
+        description: >
+          PAT mit 'repo'-Scope (oder Fine-Grained PAT mit 'Administration: Read').
+          Nur für check-branch-protection benötigt. Ohne dieses Secret wird der
+          Check übersprungen und gibt eine Warning aus.
+        required: false
 
 permissions:
   contents: read
@@ -195,7 +202,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      administration: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
@@ -205,4 +211,6 @@ jobs:
 
       - run: bash guardrails/scripts/check_branch_protection.sh ${{ inputs.strict && '--strict' || '' }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          # PAT mit repo-Scope (oder Fine-Grained PAT mit Administration:Read).
+          # Ohne Secret → Script gibt Warning aus und beendet mit Exit 0.
+          GH_TOKEN: ${{ secrets.admin-token || github.token }}
