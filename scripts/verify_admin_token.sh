@@ -55,9 +55,13 @@ verify_one() {
   fi
   if ! prot_out="$(GH_TOKEN="$token" gh api "repos/${REPO}/branches/${branch}/protection" 2>&1)"; then
     if echo "$prot_out" | grep -q "403\|Must have admin rights"; then
-      gh_error "[${label}] Branch protection API returned 403 for '${REPO}'. Fine-grained: Metadata Read and Administration Read on this repo. Classic: repo scope where needed. Org SAML: authorize the PAT. (CICD-SEC-05-VERIFY)"
+      if [[ "$label" == "classic" ]]; then
+        gh_error "[classic] Branch protection API returned 403 for '${REPO}'. Classic PATs use the token owner's repository role: the account must have Admin or Owner on this repo (repo scope alone does not grant that). Also authorize the PAT for SAML SSO if the organization requires it. (CICD-SEC-05-VERIFY)"
+      else
+        gh_error "[${label}] Branch protection API returned 403 for '${REPO}'. Fine-grained PAT: include this repo with Metadata Read and Administration Read; authorize for SAML SSO if required. (CICD-SEC-05-VERIFY)"
+      fi
       summary ""
-      summary "**403 (${label}):** PAT is set but denied. Confirm this repo is on the token: \`${REPO}\`."
+      summary "**403 (${label}):** API denied. Repo: \`${REPO}\`."
       return 1
     elif echo "$prot_out" | grep -q "404"; then
       echo "OK [${label}]: branch protection API reachable (no rules on '${branch}' → HTTP 404)."
