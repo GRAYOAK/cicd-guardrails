@@ -27,7 +27,8 @@ on:
         description: >
           Kommagetrennte Liste von Check-IDs die übersprungen werden.
           Gültige Werte: check-prt, check-action-pinning, check-permissions,
-          check-dependency-pins, check-secrets, check-runner-config
+          check-dependency-pins, check-secrets, check-runner-config,
+          check-branch-protection
         type: string
         default: ''
 
@@ -185,3 +186,23 @@ jobs:
           path: guardrails
 
       - run: bash guardrails/scripts/check_runner_config.sh target ${{ inputs.strict && '--strict' || '' }}
+
+  # ── 7. Branch Protection ──────────────────────────────────────────────────
+  check-branch-protection:
+    name: '🛡️ Branch Protection'
+    needs: setup
+    if: ${{ !contains(inputs.skip-checks, 'check-branch-protection') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      administration: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          repository: Christopher-Rust/cicd-guardrails
+          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          path: guardrails
+
+      - run: bash guardrails/scripts/check_branch_protection.sh ${{ inputs.strict && '--strict' || '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
