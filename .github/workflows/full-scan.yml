@@ -5,12 +5,13 @@ name: CI/CD Security Full Scan
 #
 #   jobs:
 #     guardrails:
-#       uses: YOUR_ORG/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
+#       uses: Christopher-Rust/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
 #       with:
 #         strict: true
 #
-# Keine Python- oder pip-Abhängigkeiten. Benötigt nur bash, awk, grep, find
-# und yq (auf GitHub-hosted Runnern vorinstalliert).
+# Der Guardrails-SHA wird aus GITHUB_WORKFLOW_REF geparst – das ist der Ref
+# mit dem dieser Workflow aufgerufen wurde (z.B. @f878a48...).
+# So stimmen Workflow-Definition und Skripte immer überein.
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -35,27 +36,51 @@ permissions:
 
 jobs:
 
+  # ── Setup: Guardrails-SHA aus Workflow-Ref extrahieren ────────────────────
+  setup:
+    name: 'Setup'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      guardrails-ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - name: Guardrails-Ref aus GITHUB_WORKFLOW_REF ermitteln
+        id: ref
+        # GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/file.yml@<SHA>"
+        # Nach dem letzten @ ist der exakte Ref mit dem dieser Workflow aufgerufen wurde
+        run: |
+          REF="${GITHUB_WORKFLOW_REF##*@}"
+          echo "ref=$REF" >> $GITHUB_OUTPUT
+          echo "Guardrails-Ref: $REF"
+
   # ── 1. pull_request_target ────────────────────────────────────────────────
   check-prt:
     name: '🚨 pull_request_target'
+    needs: setup
     if: ${{ !contains(inputs.skip-checks, 'check-prt') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - name: Checkout aufrufendes Repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           path: target
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Checkout Guardrails-Skripte
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
-          repository: ${{ github.repository_owner }}/cicd-guardrails
-          ref: ${{ github.workflow_sha }}
+          repository: Christopher-Rust/cicd-guardrails
+          ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
+
       - run: bash guardrails/scripts/check_prt.sh target
 
   # ── 2. Action SHA-Pinning ─────────────────────────────────────────────────
   check-action-pinning:
     name: '📌 Action SHA-Pinning'
+    needs: setup
     if: ${{ !contains(inputs.skip-checks, 'check-action-pinning') }}
     runs-on: ubuntu-latest
     permissions:
@@ -64,16 +89,19 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           path: target
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
-          repository: ${{ github.repository_owner }}/cicd-guardrails
-          ref: ${{ github.workflow_sha }}
+          repository: Christopher-Rust/cicd-guardrails
+          ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
+
       - run: bash guardrails/scripts/check_pinning.sh target
 
   # ── 3. Workflow-Permissions ───────────────────────────────────────────────
   check-permissions:
     name: '🔐 Workflow-Permissions'
+    needs: setup
     if: ${{ !contains(inputs.skip-checks, 'check-permissions') }}
     runs-on: ubuntu-latest
     permissions:
@@ -82,16 +110,19 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           path: target
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
-          repository: ${{ github.repository_owner }}/cicd-guardrails
-          ref: ${{ github.workflow_sha }}
+          repository: Christopher-Rust/cicd-guardrails
+          ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
+
       - run: bash guardrails/scripts/check_permissions.sh target
 
   # ── 4. Dependency Lock Files ──────────────────────────────────────────────
   check-dependency-pins:
     name: '🔒 Dependency Lock Files'
+    needs: setup
     if: ${{ !contains(inputs.skip-checks, 'check-dependency-pins') }}
     runs-on: ubuntu-latest
     permissions:
@@ -100,16 +131,19 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           path: target
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
-          repository: ${{ github.repository_owner }}/cicd-guardrails
-          ref: ${{ github.workflow_sha }}
+          repository: Christopher-Rust/cicd-guardrails
+          ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
+
       - run: bash guardrails/scripts/check_lockfiles.sh target
 
   # ── 5. Secret Scanning ────────────────────────────────────────────────────
   check-secrets:
     name: '🕵️ Secret Scanning (gitleaks)'
+    needs: setup
     if: ${{ !contains(inputs.skip-checks, 'check-secrets') }}
     runs-on: ubuntu-latest
     permissions:
@@ -118,22 +152,23 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 0
+
       - name: Installiere gitleaks
         run: |
           GITLEAKS_VERSION="8.21.2"
-          # ⚠️  SHA256 aus https://github.com/gitleaks/gitleaks/releases/tag/v8.21.2
-          # (sha256sums.txt → Zeile für gitleaks_8.21.2_linux_x64.tar.gz) eintragen:
-          # EXPECTED_SHA="..."
-          curl -sSL -o gitleaks.tar.gz \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          # echo "${EXPECTED_SHA}  gitleaks.tar.gz" | sha256sum -c
+          BASE="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -sSL -o gitleaks.tar.gz    "${BASE}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSL -o checksums.txt      "${BASE}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep "linux_x64.tar.gz" checksums.txt | sha256sum -c
           tar xzf gitleaks.tar.gz gitleaks
+
       - name: Scanne auf Secrets
         run: ./gitleaks detect --source . --exit-code 1 --redact
 
   # ── 6. Runner-Konfiguration ───────────────────────────────────────────────
   check-runner-config:
     name: '🖥️ Runner-Konfiguration'
+    needs: setup
     if: ${{ !contains(inputs.skip-checks, 'check-runner-config') }}
     runs-on: ubuntu-latest
     permissions:
@@ -142,9 +177,11 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           path: target
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
-          repository: ${{ github.repository_owner }}/cicd-guardrails
-          ref: ${{ github.workflow_sha }}
+          repository: Christopher-Rust/cicd-guardrails
+          ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
+
       - run: bash guardrails/scripts/check_runner_config.sh target ${{ inputs.strict && '--strict' || '' }}
