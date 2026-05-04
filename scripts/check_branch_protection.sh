@@ -9,7 +9,8 @@
 #   ✔  force-pushes verboten
 #
 # Benötigt: gh CLI (auf GitHub-hosted Runnern vorinstalliert) + jq
-# Permission: administration: read  (im aufrufenden Job setzen)
+# Token: Branch-Protection lesen erfordert PAT/App mit Administration-Lesezugriff;
+# das eingebaute Actions-Token reicht dafür in der Regel nicht.
 #
 # Verwendung: bash check_branch_protection.sh [--strict]
 # ─────────────────────────────────────────────────────────────────────────────
@@ -80,8 +81,10 @@ if ! PROTECTION=$(gh api "repos/${REPO}/branches/${BRANCH}/protection" 2>&1); th
 Direkter Push auf '${BRANCH}' ist möglich – kein 4-Augen-Prinzip erzwungen. (CICD-SEC-05)"
     exit 1
   elif echo "$PROTECTION" | grep -q "403\|Must have admin rights"; then
-    gh_warning "Branch-Protection-Check übersprungen: Token hat kein 'administration: read'. \
-Füge 'administration: read' zu den Job-Permissions hinzu."
+    gh_warning "Branch-Protection-Check übersprungen: Kein Lesezugriff auf Branch-Protection (403). \
+Das eingebaute Actions-Token kann diese API nicht nutzen. \
+Für einen vollständigen Check ein PAT oder GitHub-App-Installations-Token mit Administration-Lesezugriff \
+auf dieses Repository als GH_TOKEN setzen (z. B. als Repository-Secret in GitHub Actions)."
     exit 0
   else
     gh_error "GitHub API Fehler beim Abrufen der Branch-Protection: ${PROTECTION}"
