@@ -30,21 +30,27 @@ fi
 gh_error()   { echo "::error::$1";   }
 gh_warning() { echo "::warning::$1"; }
 
-# ── Branch ermitteln (main → master → Fallback) ──────────────────────────────
+# ── Branch ermitteln (default branch → main/master fallback) ──────────────────
 BRANCH=""
-for b in main master; do
-  if gh api "repos/${REPO}/branches/${b}/protection" &>/dev/null 2>&1; then
-    BRANCH="$b"
-    break
-  elif gh api "repos/${REPO}/branches/${b}" &>/dev/null 2>&1; then
-    # Branch existiert, hat aber (noch) keine Protection
-    BRANCH="$b"
-    break
-  fi
-done
+
+# Prefer repository default branch so repos with custom names are supported.
+DEFAULT_BRANCH="$(gh api "repos/${REPO}" --jq '.default_branch // empty' 2>/dev/null || true)"
+if [[ -n "$DEFAULT_BRANCH" ]] && gh api "repos/${REPO}/branches/${DEFAULT_BRANCH}" &>/dev/null 2>&1; then
+  BRANCH="$DEFAULT_BRANCH"
+fi
+
+# Fallback for repositories where default branch lookup is unavailable.
+if [[ -z "$BRANCH" ]]; then
+  for b in main master; do
+    if gh api "repos/${REPO}/branches/${b}" &>/dev/null 2>&1; then
+      BRANCH="$b"
+      break
+    fi
+  done
+fi
 
 if [[ -z "$BRANCH" ]]; then
-  gh_error "Konnte weder 'main' noch 'master' Branch finden. (CICD-SEC-05)"
+  gh_error "Konnte keinen gültigen Standard-Branch im Repository finden. (CICD-SEC-05)"
   exit 1
 fi
 
