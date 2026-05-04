@@ -34,9 +34,13 @@ on:
     secrets:
       admin-token:
         description: >
-          PAT mit 'repo'-Scope (oder Fine-Grained PAT mit 'Administration: Read').
-          Für check-branch-protection; bei strict=true wird vorab geprüft, dass
-          das Secret gesetzt ist und die Branch-Protection-API lesbar ist.
+          Classic PAT (repo scope as needed). Optional if admin-token-fg is set.
+          Verified when non-empty; branch protection prefers admin-token-fg when set.
+        required: false
+      admin-token-fg:
+        description: >
+          Fine-grained PAT (Metadata Read + Administration Read on the caller repo).
+          Optional if admin-token is set. Verified when non-empty.
         required: false
 
 permissions:
@@ -212,13 +216,10 @@ jobs:
       - name: Verify admin PAT for branch protection
         run: bash guardrails/scripts/verify_admin_token.sh ${{ inputs.strict && '--strict' || '' }}
         env:
-          GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
-          GUARDRAILS_HAS_ADMIN_SECRET: ${{ secrets['admin-token'] != '' }}
+          GUARDRAILS_PAT_CLASSIC: ${{ secrets['admin-token'] }}
+          GUARDRAILS_PAT_FG: ${{ secrets['admin-token-fg'] }}
 
       - run: bash guardrails/scripts/check_branch_protection.sh ${{ inputs.strict && '--strict' || '' }}
         env:
-          # Branch protection is not readable with the default Actions token alone.
-          # Pass a PAT or app installation token with administration read on the target repo.
-          # Without that secret the script warns and exits successfully.
-          # Hyphenated workflow_call secret: dot form is parsed as subtraction; use brackets.
-          GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
+          # Prefer fine-grained PAT for the policy check when both are supplied.
+          GH_TOKEN: ${{ secrets['admin-token-fg'] || secrets['admin-token'] || github.token }}
