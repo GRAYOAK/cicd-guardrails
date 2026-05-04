@@ -33,13 +33,17 @@ gh_warning() { echo "::warning::$1"; }
 # ── Branch ermitteln (default branch → main/master fallback) ──────────────────
 BRANCH=""
 
-# Prefer repository default branch so repos with custom names are supported.
-DEFAULT_BRANCH="$(gh api "repos/${REPO}" --jq '.default_branch // empty' 2>/dev/null || true)"
-if [[ -n "$DEFAULT_BRANCH" ]] && gh api "repos/${REPO}/branches/${DEFAULT_BRANCH}" &>/dev/null 2>&1; then
-  BRANCH="$DEFAULT_BRANCH"
+# Prefer default branch from repository metadata. Do not require a separate
+# branches/{name} probe: that endpoint can fail (permissions, transient errors)
+# even when metadata and protection checks work with the same token.
+if REPO_JSON="$(gh api "repos/${REPO}" 2>&1)" && echo "$REPO_JSON" | jq -e . >/dev/null 2>&1; then
+  DEFAULT_BRANCH="$(echo "$REPO_JSON" | jq -r 'if (.default_branch | type) == "string" and (.default_branch | length) > 0 then .default_branch else empty end')"
+  if [[ -n "$DEFAULT_BRANCH" ]]; then
+    BRANCH="$DEFAULT_BRANCH"
+  fi
 fi
 
-# Fallback for repositories where default branch lookup is unavailable.
+# Fallback when metadata is missing or unreadable.
 if [[ -z "$BRANCH" ]]; then
   for b in main master; do
     if gh api "repos/${REPO}/branches/${b}" &>/dev/null 2>&1; then
@@ -50,7 +54,19 @@ if [[ -z "$BRANCH" ]]; then
 fi
 
 if [[ -z "$BRANCH" ]]; then
-  gh_error "Konnte keinen gültigen Standard-Branch im Repository finden. (CICD-SEC-05)"
+  if [[ -n "${REPO_JSON:-}" ]] && ! echo "$REPO_JSON" | jq -e . >/dev/null 2>&1; then
+    REPO_ERR_SNIP="$(echo "$REPO_JSON" | tr '\n' ' ' | cut -c1-400)"
+    gh_error "GitHub API lieferte keine gültigen Repo-Metadaten (Auth/Netzwerk/Repo?). ${REPO_ERR_SNIP} (CICD-SEC-05)"
+  elif [[ -n "${REPO_JSON:-}" ]] && echo "$REPO_JSON" | jq -e . >/dev/null 2>&1; then
+    MSG="$(echo "$REPO_JSON" | jq -r '.message // empty')"
+    if [[ -n "$MSG" ]]; then
+      gh_error "Repo-Metadaten: ${MSG} (CICD-SEC-05)"
+    else
+      gh_error "Konnte keinen gültigen Standard-Branch im Repository finden (default_branch fehlt?). (CICD-SEC-05)"
+    fi
+  else
+    gh_error "Konnte keinen gültigen Standard-Branch im Repository finden. (CICD-SEC-05)"
+  fi
   exit 1
 fi
 
