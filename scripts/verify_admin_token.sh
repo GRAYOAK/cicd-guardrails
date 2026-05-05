@@ -69,6 +69,7 @@ verify_one() {
       summary "**403 (${label}):** API denied. Repo: \`${REPO}\`."
       summary "- token user: \`${viewer_login:-unknown}\`"
       summary "- repo permissions from /repos endpoint: pull=\`${perm_pull}\`, push=\`${perm_push}\`, maintain=\`${perm_maintain}\`, admin=\`${perm_admin}\`"
+      summary "- raw API message: \`$(echo "$prot_out" | tr '\n' ' ' | cut -c1-350)\`"
       return 1
     elif echo "$prot_out" | grep -q "404"; then
       echo "OK [${label}]: branch protection API reachable (no rules on '${branch}' → HTTP 404)."
