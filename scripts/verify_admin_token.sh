@@ -33,7 +33,7 @@ summary() {
 verify_one() {
   local label="$1"
   local token="$2"
-  local repo_json prot_out api_msg branch
+  local repo_json prot_out api_msg branch viewer_login perm_pull perm_push perm_admin perm_maintain
 
   if ! repo_json="$(GH_TOKEN="$token" gh api "repos/${REPO}" 2>&1)"; then
     gh_error "[${label}] Cannot read repository metadata or token invalid: $(echo "$repo_json" | tr '\n' ' ' | cut -c1-400) (CICD-SEC-05-VERIFY)"
@@ -48,6 +48,11 @@ verify_one() {
     gh_error "[${label}] GitHub API: ${api_msg} (CICD-SEC-05-VERIFY)"
     return 1
   fi
+  viewer_login="$(GH_TOKEN="$token" gh api user --jq '.login' 2>/dev/null || true)"
+  perm_pull="$(echo "$repo_json" | jq -r '.permissions.pull // false')"
+  perm_push="$(echo "$repo_json" | jq -r '.permissions.push // false')"
+  perm_admin="$(echo "$repo_json" | jq -r '.permissions.admin // false')"
+  perm_maintain="$(echo "$repo_json" | jq -r '.permissions.maintain // false')"
   branch="$(echo "$repo_json" | jq -r 'if (.default_branch | type) == "string" and (.default_branch | length) > 0 then .default_branch else empty end')"
   if [[ -z "$branch" ]]; then
     gh_error "[${label}] No default_branch in repository metadata. (CICD-SEC-05-VERIFY)"
@@ -62,6 +67,8 @@ verify_one() {
       fi
       summary ""
       summary "**403 (${label}):** API denied. Repo: \`${REPO}\`."
+      summary "- token user: \`${viewer_login:-unknown}\`"
+      summary "- repo permissions from /repos endpoint: pull=\`${perm_pull}\`, push=\`${perm_push}\`, maintain=\`${perm_maintain}\`, admin=\`${perm_admin}\`"
       return 1
     elif echo "$prot_out" | grep -q "404"; then
       echo "OK [${label}]: branch protection API reachable (no rules on '${branch}' → HTTP 404)."
