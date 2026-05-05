@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
-# Verifies PAT(s) passed into the reusable workflow can read repository metadata
+# Verifies PAT passed into the reusable workflow can read repository metadata
 # and the branch protection API for the calling repository (CI).
 #
 # Optional env (from workflow):
-#   GUARDRAILS_PAT_CLASSIC   classic PAT (maps to admin-token)
-#   GUARDRAILS_PAT_FG      fine-grained PAT (maps to admin-token-fg)
+#   GH_TOKEN               token used by gh
+#   GUARDRAILS_HAS_ADMIN_SECRET  "true" if admin-token was passed
 #   GITHUB_REPOSITORY      set by Actions
-#
-# If both are set, both are checked. In --strict, every supplied token must pass.
 #
 # Usage: bash verify_admin_token.sh [--strict]
 # ─────────────────────────────────────────────────────────────────────────────
@@ -18,8 +16,7 @@ STRICT=false
 [[ "${1:-}" == "--strict" ]] && STRICT=true
 
 REPO="${GITHUB_REPOSITORY:-}"
-CLASSIC="${GUARDRAILS_PAT_CLASSIC:-}"
-FG="${GUARDRAILS_PAT_FG:-}"
+HAS_ADMIN_SECRET="${GUARDRAILS_HAS_ADMIN_SECRET:-false}"
 
 gh_error()   { echo "::error::$1";   }
 gh_warning() { echo "::warning::$1"; }
@@ -30,61 +27,55 @@ summary() {
   fi
 }
 
-verify_one() {
-  local label="$1"
-  local token="$2"
+verify_token() {
   local repo_json prot_out api_msg branch viewer_login perm_pull perm_push perm_admin perm_maintain
 
-  if ! repo_json="$(GH_TOKEN="$token" gh api "repos/${REPO}" 2>&1)"; then
-    gh_error "[${label}] Cannot read repository metadata or token invalid: $(echo "$repo_json" | tr '\n' ' ' | cut -c1-400) (CICD-SEC-05-VERIFY)"
+  if ! repo_json="$(gh api "repos/${REPO}" 2>&1)"; then
+    gh_error "Cannot read repository metadata or token invalid: $(echo "$repo_json" | tr '\n' ' ' | cut -c1-400) (CICD-SEC-05-VERIFY)"
     return 1
   fi
   if ! echo "$repo_json" | jq -e . >/dev/null 2>&1; then
-    gh_error "[${label}] Repository metadata is not valid JSON: $(echo "$repo_json" | tr '\n' ' ' | cut -c1-400) (CICD-SEC-05-VERIFY)"
+    gh_error "Repository metadata is not valid JSON: $(echo "$repo_json" | tr '\n' ' ' | cut -c1-400) (CICD-SEC-05-VERIFY)"
     return 1
   fi
   api_msg="$(echo "$repo_json" | jq -r '.message // empty')"
   if [[ -n "$api_msg" ]]; then
-    gh_error "[${label}] GitHub API: ${api_msg} (CICD-SEC-05-VERIFY)"
+    gh_error "GitHub API: ${api_msg} (CICD-SEC-05-VERIFY)"
     return 1
   fi
-  viewer_login="$(GH_TOKEN="$token" gh api user --jq '.login' 2>/dev/null || true)"
+  viewer_login="$(gh api user --jq '.login' 2>/dev/null || true)"
   perm_pull="$(echo "$repo_json" | jq -r '.permissions.pull // false')"
   perm_push="$(echo "$repo_json" | jq -r '.permissions.push // false')"
   perm_admin="$(echo "$repo_json" | jq -r '.permissions.admin // false')"
   perm_maintain="$(echo "$repo_json" | jq -r '.permissions.maintain // false')"
   branch="$(echo "$repo_json" | jq -r 'if (.default_branch | type) == "string" and (.default_branch | length) > 0 then .default_branch else empty end')"
   if [[ -z "$branch" ]]; then
-    gh_error "[${label}] No default_branch in repository metadata. (CICD-SEC-05-VERIFY)"
+    gh_error "No default_branch in repository metadata. (CICD-SEC-05-VERIFY)"
     return 1
   fi
-  if ! prot_out="$(GH_TOKEN="$token" gh api "repos/${REPO}/branches/${branch}/protection" 2>&1)"; then
+  if ! prot_out="$(gh api "repos/${REPO}/branches/${branch}/protection" 2>&1)"; then
     if echo "$prot_out" | grep -q "Upgrade to GitHub Pro or make this repository public"; then
-      gh_warning "[${label}] Branch protection check skipped: feature unavailable for this repository plan (private repo without required GitHub plan). (CICD-SEC-05-VERIFY)"
-      summary "- **${label}:** SKIPPED (branch protection endpoint unavailable for current repository plan)."
+      gh_warning "Branch protection check skipped: feature unavailable for this repository plan (private repo without required GitHub plan). (CICD-SEC-05-VERIFY)"
+      summary "Result: **SKIPPED** (branch protection endpoint unavailable for current repository plan)."
       return 0
     elif echo "$prot_out" | grep -q "403\|Must have admin rights"; then
-      if [[ "$label" == "classic" ]]; then
-        gh_error "[classic] Branch protection API returned 403 for '${REPO}'. Classic PATs use the token owner's repository role: the account must have Admin or Owner on this repo (repo scope alone does not grant that). Also authorize the PAT for SAML SSO if the organization requires it. (CICD-SEC-05-VERIFY)"
-      else
-        gh_error "[${label}] Branch protection API returned 403 for '${REPO}'. Fine-grained PAT: include this repo with Metadata Read and Administration Read; authorize for SAML SSO if required. (CICD-SEC-05-VERIFY)"
-      fi
+      gh_error "Branch protection API returned 403 for '${REPO}'. Ensure this token can read protection rules on this repository and is authorized for SAML SSO if required. (CICD-SEC-05-VERIFY)"
       summary ""
-      summary "**403 (${label}):** API denied. Repo: \`${REPO}\`."
+      summary "**403:** API denied. Repo: \`${REPO}\`."
       summary "- token user: \`${viewer_login:-unknown}\`"
       summary "- repo permissions from /repos endpoint: pull=\`${perm_pull}\`, push=\`${perm_push}\`, maintain=\`${perm_maintain}\`, admin=\`${perm_admin}\`"
       summary "- raw API message: \`$(echo "$prot_out" | tr '\n' ' ' | cut -c1-350)\`"
       return 1
     elif echo "$prot_out" | grep -q "404"; then
-      echo "OK [${label}]: branch protection API reachable (no rules on '${branch}' → HTTP 404)."
-      summary "- **${label}:** PASS (404 = no protection rules configured)."
+      echo "OK: branch protection API reachable (no rules on '${branch}' → HTTP 404)."
+      summary "Result: **PASS** (404 = no protection rules configured)."
       return 0
     fi
-    gh_error "[${label}] Unexpected branch protection response: $(echo "$prot_out" | tr '\n' ' ' | cut -c1-500) (CICD-SEC-05-VERIFY)"
+    gh_error "Unexpected branch protection response: $(echo "$prot_out" | tr '\n' ' ' | cut -c1-500) (CICD-SEC-05-VERIFY)"
     return 1
   fi
-  echo "OK [${label}]: branch protection readable for '${REPO}@${branch}'."
-  summary "- **${label}:** PASS (protection payload returned)."
+  echo "OK: branch protection readable for '${REPO}@${branch}'."
+  summary "Result: **PASS** (protection payload returned)."
   return 0
 }
 
@@ -93,8 +84,7 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   summary ""
   summary "- Repository: \`${REPO:-<unset>}\`"
   summary "- Event: \`${GITHUB_EVENT_NAME:-unknown}\`"
-  summary "- Classic PAT supplied: $([[ -n "$CLASSIC" ]] && echo yes || echo no)"
-  summary "- Fine-grained PAT supplied: $([[ -n "$FG" ]] && echo yes || echo no)"
+  summary "- Admin token passed into reusable workflow: \`${HAS_ADMIN_SECRET}\`"
   summary ""
 fi
 
@@ -103,8 +93,8 @@ if [[ -z "$REPO" ]]; then
   exit 1
 fi
 
-if [[ -z "$CLASSIC" ]] && [[ -z "$FG" ]]; then
-  msg="No admin PAT passed (neither classic nor fine-grained). Map GUARDRAILS_ADMIN_TOKEN / GUARDRAILS_ADMIN_TOKEN_FG in the caller to admin-token / admin-token-fg. Fork pull_request runs often have no secrets. (CICD-SEC-05-VERIFY)"
+if [[ "$HAS_ADMIN_SECRET" != "true" ]]; then
+  msg="No admin PAT was passed into this reusable workflow. Map GUARDRAILS_ADMIN_TOKEN in the caller to admin-token. Fork pull_request runs often have no secrets. (CICD-SEC-05-VERIFY)"
   if [[ "$STRICT" == "true" ]]; then
     gh_error "$msg"
     summary ""
@@ -125,33 +115,15 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-FAIL=0
-if [[ -n "$CLASSIC" ]]; then
-  summary "### Classic PAT"
-  if ! verify_one "classic" "$CLASSIC"; then
-    FAIL=1
-  fi
-  summary ""
-fi
-
-if [[ -n "$FG" ]]; then
-  summary "### Fine-grained PAT"
-  if ! verify_one "fine-grained" "$FG"; then
-    FAIL=1
-  fi
-  summary ""
-fi
-
-if [[ $FAIL -ne 0 ]]; then
+if ! verify_token; then
   if [[ "$STRICT" == "true" ]]; then
-    gh_error "One or more PAT checks failed (see logs and job summary). (CICD-SEC-05-VERIFY)"
+    gh_error "Admin token check failed (see logs and job summary). (CICD-SEC-05-VERIFY)"
     summary "Result: **FAIL**"
     exit 1
   fi
-  gh_warning "One or more PAT checks failed; continuing because strict mode is off. (CICD-SEC-05-VERIFY)"
+  gh_warning "Admin token check failed; continuing because strict mode is off. (CICD-SEC-05-VERIFY)"
   summary "Result: **WARN** (non-strict: failures do not fail the job)"
   exit 0
 fi
 
-summary "Result: **PASS** (all supplied token(s) can read branch protection)."
 exit 0

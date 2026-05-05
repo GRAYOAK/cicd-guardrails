@@ -34,13 +34,7 @@ on:
     secrets:
       admin-token:
         description: >
-          Classic PAT (repo scope as needed). Optional if admin-token-fg is set.
-          Verified when non-empty; branch protection prefers admin-token-fg when set.
-        required: false
-      admin-token-fg:
-        description: >
-          Fine-grained PAT (Metadata Read + Administration Read on the caller repo).
-          Optional if admin-token is set. Verified when non-empty.
+          PAT used for branch-protection verification and check.
         required: false
 
 permissions:
@@ -216,10 +210,9 @@ jobs:
       - name: Verify admin PAT for branch protection
         run: bash guardrails/scripts/verify_admin_token.sh ${{ inputs.strict && '--strict' || '' }}
         env:
-          GUARDRAILS_PAT_CLASSIC: ${{ secrets['admin-token'] }}
-          GUARDRAILS_PAT_FG: ${{ secrets['admin-token-fg'] }}
+          GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
+          GUARDRAILS_HAS_ADMIN_SECRET: ${{ secrets['admin-token'] != '' }}
 
       - run: bash guardrails/scripts/check_branch_protection.sh ${{ inputs.strict && '--strict' || '' }}
         env:
-          # Prefer fine-grained PAT for the policy check when both are supplied.
-          GH_TOKEN: ${{ secrets['admin-token-fg'] || secrets['admin-token'] || github.token }}
+          GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
