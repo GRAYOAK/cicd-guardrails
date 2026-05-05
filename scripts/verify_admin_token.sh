@@ -59,7 +59,11 @@ verify_one() {
     return 1
   fi
   if ! prot_out="$(GH_TOKEN="$token" gh api "repos/${REPO}/branches/${branch}/protection" 2>&1)"; then
-    if echo "$prot_out" | grep -q "403\|Must have admin rights"; then
+    if echo "$prot_out" | grep -q "Upgrade to GitHub Pro or make this repository public"; then
+      gh_warning "[${label}] Branch protection check skipped: feature unavailable for this repository plan (private repo without required GitHub plan). (CICD-SEC-05-VERIFY)"
+      summary "- **${label}:** SKIPPED (branch protection endpoint unavailable for current repository plan)."
+      return 0
+    elif echo "$prot_out" | grep -q "403\|Must have admin rights"; then
       if [[ "$label" == "classic" ]]; then
         gh_error "[classic] Branch protection API returned 403 for '${REPO}'. Classic PATs use the token owner's repository role: the account must have Admin or Owner on this repo (repo scope alone does not grant that). Also authorize the PAT for SAML SSO if the organization requires it. (CICD-SEC-05-VERIFY)"
       else

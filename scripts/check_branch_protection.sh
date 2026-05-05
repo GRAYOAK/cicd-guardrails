@@ -80,6 +80,9 @@ if ! PROTECTION=$(gh api "repos/${REPO}/branches/${BRANCH}/protection" 2>&1); th
     gh_error "Branch '${BRANCH}' hat keine Branch-Protection-Regeln. \
 Direkter Push auf '${BRANCH}' ist möglich – kein 4-Augen-Prinzip erzwungen. (CICD-SEC-05)"
     exit 1
+  elif echo "$PROTECTION" | grep -q "Upgrade to GitHub Pro or make this repository public"; then
+    gh_warning "Branch-Protection-Check übersprungen: Feature für dieses Repository im aktuellen GitHub-Plan nicht verfügbar (private repos benötigen Upgrade)."
+    exit 0
   elif echo "$PROTECTION" | grep -q "403\|Must have admin rights"; then
     gh_warning "Branch-Protection-Check übersprungen: Kein Lesezugriff auf Branch-Protection (403). \
 Das eingebaute Actions-Token kann diese API nicht nutzen. \
