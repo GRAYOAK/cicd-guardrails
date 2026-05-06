@@ -26,6 +26,10 @@ wrs_find_generic_self_hosted_jobs() {
 
 wrs_find_sudo_lines() {
   local file="$1"
-  rg -n "\\bsudo\\b" "$file" || true
+  if command -v rg >/dev/null 2>&1; then
+    rg -n "\\bsudo\\b" "$file" || true
+  else
+    grep -nE "\\<sudo\\>" "$file" || true
+  fi
 }
 

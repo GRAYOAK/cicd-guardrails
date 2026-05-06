@@ -22,7 +22,7 @@ shopt -s nullglob
 files=("$PATH_ROOT"/.github/workflows/*.yml "$PATH_ROOT"/.github/workflows/*.yaml)
 while IFS= read -r action_file; do
   files+=("$action_file")
-done < <(find "$PATH_ROOT/actions" -type f \\( -name "action.yml" -o -name "action.yaml" \\) 2>/dev/null || true)
+done < <(find "$PATH_ROOT/actions" -type f \( -name "action.yml" -o -name "action.yaml" \) 2>/dev/null || true)
 
 if [[ ${#files[@]} -eq 0 ]]; then
   fb_set_status "SKIPPED"
