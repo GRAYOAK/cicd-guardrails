@@ -22,6 +22,9 @@ Use this skill for changes in:
 ## Invariants
 
 - Keep all runtime output in English.
+- Learnings added to this skill must be generalized.
+- Do not store one-off incident details or transient version timelines.
+- Exception: keep repository-specific facts when they are structural and stable (tasks, folders, files, and required packages).
 - Keep per-check summary blocks consistent:
   - `Searched`
   - `Found`
@@ -42,6 +45,16 @@ Use this skill for changes in:
 6. Run tests and sanity checks:
    - `bash ./tests/test_checks.sh`
    - lints/diagnostics for edited files
+7. As the final interaction step, ask the user:
+   - "Soll ich das Gelernte in diesen Skill einarbeiten (als generelle Verhaltensweisen, Speicherorte und stabile Regeln)?"
+
+## GitHub Actions runtime policy
+
+For JavaScript-based GitHub Actions in this repository:
+- Use only action revisions that run on `node24`.
+- Do not introduce or keep action revisions that run on `node20`.
+- Keep full commit SHA pinning after version updates.
+- Validate the affected workflows, tests, and fixtures together after pin changes.
 
 ## Risk summary and context model
 
