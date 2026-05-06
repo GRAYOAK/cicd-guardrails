@@ -14,8 +14,10 @@ Grundlage: [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top
 | `check-permissions` | CICD-SEC-05 | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
 | `check-dependency-pins` | CICD-SEC-03 | Fehlende Lock-Files (npm, pip, Poetry, Go, Rust, Ruby, PHP) |
 | `check-secrets` | CICD-SEC-06 | Hardcoded Secrets via gitleaks |
-| `check-runner-config` | CICD-SEC-05/07 | `--privileged` Container, generische self-hosted Runner, sudo |
-| `check-branch-protection` | CICD-SEC-05 | Kein PR-Zwang, kein 4-Augen-Prinzip, force-pushes erlaubt |
+| `check-flow-control` | CICD-SEC-01 | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
+| `check-pbac-branch-policy` | CICD-SEC-05 | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
+| `check-runner-access` | CICD-SEC-05 | Generische self-hosted Runner Labels ohne Segmentierung |
+| `check-runner-hardening` | CICD-SEC-07 | `--privileged` Container und `sudo` in Workflows |
 
 ---
 
@@ -73,8 +75,8 @@ jobs:
 ```
 
 > **Ohne GitHub App:** Den `generate-token` Job weglassen und `secrets:` Block entfernen.
-> Der `check-branch-protection` Check gibt dann eine Warning aus und wird übersprungen.
-> Alle anderen 6 Checks laufen normal weiter.
+> Die Branch-basierten Checks (`check-flow-control`, `check-pbac-branch-policy`) können ohne Admin-Token skipped oder eingeschränkt sein.
+> Alle file-basierten Checks laufen normal weiter.
 
 ### 3. Branch Protection konfigurieren (PRs blockieren)
 
@@ -102,7 +104,7 @@ jobs:
     uses: YOUR_ORG/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
     with:
       strict: false
-      skip-checks: 'check-secrets,check-runner-config'
+      skip-checks: 'check-secrets,check-runner-hardening'
 ```
 
 ### 5. Risiko-Kontext über `.guardrails.yml` steuern
@@ -131,7 +133,7 @@ Wie die Werte einfließen:
 
 - `visibility=public` erhöht Risiko-Gewichtung für `CICD-SEC-04`, `CICD-SEC-06`, `CICD-SEC-08`
 - `software_type=open_source` gewichtet Supply-Chain/Exposure höher
-- `runner_type=self_hosted` gewichtet Runner-/Hardening-Themen höher
+- `runner_type=self_hosted` gewichtet Runner-Access- und Hardening-Themen höher
 - `data_sensitivity=high` und `deployment_criticality=prod|regulated` erhöhen Priorität für Secrets, Permissions und Runner-Kontrollen
 
 Fehlt die Datei, nutzt Guardrails konservative Defaults und schreibt das transparent ins Summary.
@@ -171,16 +173,26 @@ Beispiel (gekürzt):
 cicd-guardrails/
 ├── .github/
 │   └── workflows/
-│       ├── full-scan.yml          # Reusable Orchestrator (von anderen Repos aufrufbar)
-│       └── self-test.yml          # Dogfooding: dieses Repo prüft sich selbst
+│       ├── full-scan.yml                 # Reusable Orchestrator (von anderen Repos aufrufbar)
+│       └── self-test.yml                 # Dogfooding: dieses Repo prüft sich selbst
 │
-├── scripts/                       # Bash-Skripte – keine Dependencies nötig
-│   ├── check_prt.sh               # pull_request_target Erkennung (awk)
-│   ├── check_pinning.sh           # SHA-Pinning Enforcement (awk + grep)
-│   ├── check_permissions.sh       # Permissions Blöcke (yq)
-│   ├── check_lockfiles.sh         # Dependency Lock-Files (bash + find)
-│   ├── check_runner_config.sh     # Runner-Konfiguration (yq + grep)
-│   └── check_branch_protection.sh # Branch-Protection via GitHub API (gh + jq)
+├── scripts/
+│   ├── checks/
+│   │   ├── domain/                       # Fachliche Startpunkte
+│   │   │   ├── check_flow_control.sh
+│   │   │   ├── check_pbac_branch_policy.sh
+│   │   │   ├── check_runner_access.sh
+│   │   │   └── check_runner_hardening.sh
+│   │   └── tech/                         # Technische Adapter (API/Parsing/CLI)
+│   │       ├── github_branch_protection_api.sh
+│   │       └── workflow_runner_scan.sh
+│   ├── check_prt.sh
+│   ├── check_pinning.sh
+│   ├── check_permissions.sh
+│   ├── check_lockfiles.sh
+│   ├── check_secrets.sh
+│   ├── aggregate_risk_summary.sh
+│   └── lib/feedback.sh
 │
 └── tests/
     ├── fixtures/
@@ -200,8 +212,10 @@ bash scripts/check_prt.sh          /pfad/zum/repo
 bash scripts/check_pinning.sh      /pfad/zum/repo
 bash scripts/check_permissions.sh  /pfad/zum/repo   # benötigt yq
 bash scripts/check_lockfiles.sh    /pfad/zum/repo
-bash scripts/check_runner_config.sh /pfad/zum/repo
-GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo bash scripts/check_branch_protection.sh
+bash scripts/checks/domain/check_runner_access.sh /pfad/zum/repo
+bash scripts/checks/domain/check_runner_hardening.sh /pfad/zum/repo
+GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo bash scripts/checks/domain/check_flow_control.sh
+GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo bash scripts/checks/domain/check_pbac_branch_policy.sh
 
 # Tests ausführen
 bash tests/test_checks.sh
@@ -232,6 +246,6 @@ updates:
 
 **yq:** Auf GitHub-hosted Runnern vorinstalliert. Lokal: `brew install yq`.
 
-**check-branch-protection:** Dieser Check benötigt ein GitHub App Token mit `Administration: Read` Permission. Ohne Token wird der Check mit einer Warning übersprungen. Setup: GitHub App erstellen → Private Key generieren → Secrets `APP_ID` und `APP_PRIVATE_KEY` im Ziel-Repo hinterlegen → App auf dem Repo installieren.
+**branch-basierte domain checks:** `check_flow_control.sh` und `check_pbac_branch_policy.sh` benötigen für vollständige API-Auswertung ein Token mit Branch-Protection-Leserechten. Ohne geeigneten Token werden API-Pfade als Warnung/Skip behandelt.
 
 **Rechte:** Alle anderen Checks brauchen nur `contents: read`. Keine Admin-Rechte erforderlich.

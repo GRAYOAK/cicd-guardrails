@@ -35,6 +35,28 @@ Use this skill for changes in:
   - `1`: actionable failure
   - `2`: missing runtime dependency
 
+## Engineering principles
+
+- Keep domain logic and technical execution separate:
+  - Domain checks define security intent, policy rules, and OWASP designation.
+  - Technical adapters encapsulate API calls, CLI invocation, parsing, and runtime dependency handling.
+- Keep one primary security responsibility per check.
+- Prefer clear single designations per check over mixed composite identifiers.
+- Keep reporting contract stable and centralized through feedback helpers.
+- Apply changes end-to-end:
+  - check logic
+  - workflow wiring
+  - aggregation/scoring
+  - tests
+  - README and workspace:Main documentation
+  - consumer workflow pinning and migration notes
+- Keep breaking changes explicit and synchronized across producer and consumer repositories.
+- Keep tests focused on behavior contracts:
+  - designation values
+  - exit semantics
+  - summary structure
+  - artifact compatibility with risk aggregation
+
 ## Required workflow for changes
 
 1. Inspect affected scripts and workflow wiring.
