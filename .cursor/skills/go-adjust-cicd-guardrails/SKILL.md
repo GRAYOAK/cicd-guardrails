@@ -42,10 +42,11 @@ Use this skill for changes in:
 3. Propagate to check scripts with minimal duplication.
 4. Ensure reusable workflow still uploads/downstreams artifacts expected by summary jobs.
 5. Update docs for any behavior change (`README.md`).
-6. Run tests and sanity checks:
+6. Document the current software state in `workspace:Main`.
+7. Run tests and sanity checks:
    - `bash ./tests/test_checks.sh`
    - lints/diagnostics for edited files
-7. As the final interaction step, ask the user:
+8. As the final interaction step, ask the user:
    - "Soll ich das Gelernte in diesen Skill einarbeiten (als generelle Verhaltensweisen, Speicherorte und stabile Regeln)?"
 
 ## GitHub Actions runtime policy
@@ -144,3 +145,4 @@ When changes affect reusable workflow usage in `cicd-demo-errors`:
 - Workflow wiring still consistent for artifacts and final summary job.
 - README reflects behavior for users of reusable workflow.
 - Schema/example docs and consumer config examples are consistent.
+- Current software state is documented in `workspace:Main`.
