@@ -1,90 +1,72 @@
 #!/usr/bin/env bash
-# OWASP CICD-SEC-05 / CICD-SEC-07: Runner-Konfiguration
-#
-# Prüft Workflows auf problematische Runner-Einstellungen:
-#   - --privileged Container-Option            → Error
-#   - runs-on: self-hosted ohne weitere Labels → Warning
-#   - sudo in run-Steps                        → Warning
-#
-# Exit 0 = keine Probleme (oder nur Warnings ohne --strict)
-# Exit 1 = Errors, oder Warnings mit --strict
 
 set -euo pipefail
 
-PATH_ROOT="${1:-.}"
-STRICT="${2:-}"
-WORKFLOWS_DIR="$PATH_ROOT/.github/workflows"
-ERRORS=0
-WARNINGS=0
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/feedback.sh
+source "${SCRIPT_DIR}/lib/feedback.sh"
 
-if ! command -v yq &>/dev/null; then
-  echo "❌ yq nicht gefunden. Installation: https://github.com/mikefarah/yq"
-  exit 2
+PATH_ROOT="${1:-.}"
+STRICT=false
+[[ "${2:-}" == "--strict" ]] && STRICT=true
+WORKFLOWS_DIR="${PATH_ROOT}/.github/workflows"
+MISSING_RUNTIME=false
+
+fb_init "CICD-SEC-05-07" "Runner configuration check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC/ , https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-07-Insecure-System-Configuration/"
+fb_add_searched "Privileged container options in workflow jobs"
+fb_add_searched "Generic self-hosted runner labels"
+fb_add_searched "Use of sudo in run steps"
+
+if ! command -v yq >/dev/null 2>&1; then
+  MISSING_RUNTIME=true
+  fb_report "error" "Missing required runtime dependency yq." "" "" \
+    "Install yq in the runner environment before running this check."
+  fb_summary
+  exit "$(fb_exit_code "$STRICT" "$MISSING_RUNTIME")"
 fi
 
 shopt -s nullglob
 files=("$WORKFLOWS_DIR"/*.yml "$WORKFLOWS_DIR"/*.yaml)
 
 if [[ ${#files[@]} -eq 0 ]]; then
-  echo "ℹ️  Keine Workflow-Dateien gefunden."
-  exit 0
+  fb_set_status "SKIPPED"
+  fb_add_remediation "No workflow files found; no action required."
+  fb_summary
+  exit "$(fb_exit_code "$STRICT" false)"
 fi
 
 for file in "${files[@]}"; do
   rel="${file#"$PATH_ROOT/"}"
 
-  # ── --privileged Container ────────────────────────────────────────────────
-  # yq gibt alle container.options-Werte aus; grep sucht nach --privileged
-  privileged_jobs=$(yq '.jobs | to_entries | .[] |
-    select(.value.container.options != null) |
-    select(.value.container.options | test("--privileged")) |
-    .key' "$file" 2>/dev/null || true)
-
+  privileged_jobs="$(yq '.jobs | to_entries | .[] | select(.value.container.options != null) | select(.value.container.options | test("--privileged")) | .key' "$file" 2>/dev/null || true)"
   if [[ -n "$privileged_jobs" ]]; then
     while IFS= read -r job; do
-      echo "❌ $rel – Job '$job' startet Container mit --privileged"
-      echo "   Privilegierte Container vermeiden. Falls nötig: explizites Review erzwingen."
-    done <<< "$privileged_jobs"
-    ERRORS=$((ERRORS + 1))
+      fb_report "error" "Job '${job}' uses privileged container options." "$rel" "" \
+        "Avoid privileged mode and isolate sensitive steps on hardened runners."
+    done <<<"$privileged_jobs"
   fi
 
-  # ── self-hosted ohne Labels ───────────────────────────────────────────────
-  generic_jobs=$(yq '.jobs | to_entries | .[] |
-    select(.value["runs-on"] == "self-hosted") |
-    .key' "$file" 2>/dev/null || true)
-
+  generic_jobs="$(yq '.jobs | to_entries | .[] | select(.value["runs-on"] == "self-hosted") | .key' "$file" 2>/dev/null || true)"
   if [[ -n "$generic_jobs" ]]; then
     while IFS= read -r job; do
-      echo "⚠️  $rel – Job '$job' nutzt generisches 'self-hosted' ohne Labels"
-      echo "   FIX: runs-on: [self-hosted, linux, production]"
-    done <<< "$generic_jobs"
-    WARNINGS=$((WARNINGS + 1))
+      fb_report "warning" "Job '${job}' uses generic self-hosted runner labels." "$rel" "" \
+        "Use explicit runner labels such as self-hosted, linux, and environment tags."
+    done <<<"$generic_jobs"
   fi
 
-  # ── sudo in run-Steps ─────────────────────────────────────────────────────
-  # grep direkt auf Datei – einfacher als yq für run-Block-Inhalte
-  sudo_lines=$(grep -n "\bsudo\b" "$file" | grep -v "^\s*#" || true)
+  sudo_lines="$(rg -n "\\bsudo\\b" "$file" || true)"
   if [[ -n "$sudo_lines" ]]; then
-    echo "⚠️  $rel – sudo verwendet:"
     while IFS= read -r line; do
-      echo "   $line"
-    done <<< "$sudo_lines"
-    echo "   Prüfe ob root-Rechte wirklich nötig sind."
-    WARNINGS=$((WARNINGS + 1))
+      line_num="${line%%:*}"
+      fb_report "warning" "sudo command found in workflow step." "$rel" "$line_num" \
+        "Remove sudo unless elevated privileges are required and reviewed."
+    done <<<"$sudo_lines"
   fi
-
 done
 
-# ── Ergebnis ─────────────────────────────────────────────────────────────────
-if [[ $ERRORS -eq 0 && $WARNINGS -eq 0 ]]; then
-  echo "✅ PASS: Keine Runner-Konfigurationsprobleme gefunden."
-  exit 0
+fb_auto_status "$STRICT"
+if [[ "$FB_STATUS" == "PASS" ]]; then
+  fb_add_remediation "No remediation needed."
 fi
-
-[[ $ERRORS -gt 0 ]] && echo "" && echo "→ $ERRORS Fehler, $WARNINGS Warnungen gefunden."
-
-if [[ $ERRORS -gt 0 ]] || [[ -n "$STRICT" && $WARNINGS -gt 0 ]]; then
-  exit 1
-fi
-
-exit 0
+fb_summary
+exit "$(fb_exit_code "$STRICT" false)"

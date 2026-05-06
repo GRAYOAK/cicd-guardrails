@@ -10,7 +10,7 @@ permissions:
 
 jobs:
 
-  # ── Bash-Tests ────────────────────────────────────────────────────────────
+  # ── Bash tests ────────────────────────────────────────────────────────────
   unit-tests:
     name: 'Unit Tests'
     runs-on: ubuntu-latest
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
       - run: bash tests/test_checks.sh
 
-  # ── Dieses Repo gegen eigene Regeln prüfen ────────────────────────────────
+  # ── Dogfood these checks on this repo ─────────────────────────────────────
   self-check-prt:
     name: 'Self-Check: pull_request_target'
     runs-on: ubuntu-latest
@@ -40,10 +40,19 @@ jobs:
       - run: bash scripts/check_pinning.sh .
 
   self-check-permissions:
-    name: 'Self-Check: Workflow-Permissions'
+    name: 'Self-Check: Workflow permissions'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
       - run: bash scripts/check_permissions.sh .
+
+  self-check-lockfiles:
+    name: 'Self-Check: Dependency Lock Files'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - run: bash scripts/check_lockfiles.sh .

@@ -1,65 +1,60 @@
 #!/usr/bin/env bash
-# OWASP CICD-SEC-04: Poisoned Pipeline Execution (PPE)
-#
-# Prüft ob pull_request_target in Workflow-Dateien vorkommt.
-# Ignoriert Kommentarzeilen und Inline-Kommentare.
-#
-# Exit 0 = sauber
-# Exit 1 = Findings gefunden
 
 set -euo pipefail
 
-PATH_ROOT="${1:-.}"
-WORKFLOWS_DIR="$PATH_ROOT/.github/workflows"
-FAIL=0
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/feedback.sh
+source "${SCRIPT_DIR}/lib/feedback.sh"
 
-# GitHub Actions Annotation (wird als inline PR-Kommentar angezeigt)
-gh_error() { echo "::error file=${1},line=${2}::${3}"; }
-gh_notice() { echo "::notice file=${1}::${2}"; }
+PATH_ROOT="${1:-.}"
+WORKFLOWS_DIR="${PATH_ROOT}/.github/workflows"
+
+fb_init "CICD-SEC-04" "pull_request_target check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution/"
+fb_add_searched "Workflow files under ${WORKFLOWS_DIR}"
+fb_add_searched "Unsafe trigger pattern pull_request_target outside comments"
+fb_add_searched "Critical combination with head.sha or head.ref checkout"
 
 shopt -s nullglob
 files=("$WORKFLOWS_DIR"/*.yml "$WORKFLOWS_DIR"/*.yaml)
 
 if [[ ${#files[@]} -eq 0 ]]; then
-  echo "ℹ️  Keine Workflow-Dateien in $WORKFLOWS_DIR gefunden."
-  exit 0
+  fb_set_status "SKIPPED"
+  fb_add_remediation "No workflow files found; no action required."
+  fb_summary
+  exit "$(fb_exit_code false false)"
 fi
 
 for file in "${files[@]}"; do
   rel="${file#"$PATH_ROOT/"}"
 
-  # awk: Kommentarzeilen überspringen, Inline-Kommentare entfernen, dann prüfen
-  findings=$(awk '
-    /^[[:space:]]*#/ { next }          # ganze Kommentarzeile → skip
+  findings="$(awk '
+    /^[[:space:]]*#/ { next }
     {
       line = $0
-      sub(/#.*$/, "", line)            # Inline-Kommentar entfernen
+      sub(/#.*$/, "", line)
       if (line ~ /pull_request_target/) {
         print NR ": " $0
       }
     }
-  ' "$file")
+  ' "$file")"
 
   if [[ -n "$findings" ]]; then
-    echo "❌ $rel"
     while IFS= read -r match; do
       linenum="${match%%:*}"
-      echo "   $match"
-      gh_error "$rel" "$linenum" "pull_request_target verwendet – Poisoned Pipeline Execution Risiko (OWASP CICD-SEC-04)"
-    done <<< "$findings"
+      fb_report "error" "pull_request_target enables poisoned pipeline execution risk." "$rel" "$linenum" \
+        "Use pull_request and avoid pull_request_target for untrusted pull requests."
+    done <<<"$findings"
 
-    # Besonders gefährlich: Fork-Code wird ausgecheckt
-    if grep -q "pull_request\.head\.sha\|pull_request\.head\.ref" "$file"; then
-      echo "   🔴 KRITISCH: Workflow checkt auch Fork-Code aus (head.sha/head.ref)!"
-      gh_error "$rel" "0" "KRITISCH: pull_request_target + Fork-Checkout kombiniert – aktiver PPE-Angriffspfad"
+    if rg -n "pull_request\\.head\\.sha|pull_request\\.head\\.ref" "$file" >/dev/null 2>&1; then
+      fb_report "error" "Critical path: trigger is combined with checkout of fork head refs." "$rel" "1" \
+        "Remove head ref checkout for untrusted events and isolate privileged jobs."
     fi
-    echo ""
-    FAIL=1
   fi
 done
 
-if [[ $FAIL -eq 0 ]]; then
-  echo "✅ PASS: Kein pull_request_target gefunden."
+fb_auto_status false
+if [[ "$FB_STATUS" == "PASS" ]]; then
+  fb_add_remediation "No remediation needed."
 fi
-
-exit $FAIL
+fb_summary
+exit "$(fb_exit_code false false)"

@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+FB_CHECK_ID=""
+FB_TITLE=""
+FB_SEARCHED=""
+FB_FOUND=""
+FB_REMEDIATION=""
+FB_ERROR_COUNT=0
+FB_WARNING_COUNT=0
+FB_NOTICE_COUNT=0
+FB_STATUS="PASS"
+FB_OWASP_REF=""
+
+fb__json_escape() {
+  local s="${1:-}"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+fb_write_result_json() {
+  local out_dir="${GUARDRAILS_RESULT_DIR:-}"
+  if [[ -z "$out_dir" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$out_dir"
+  local fname="${FB_CHECK_ID//[^a-zA-Z0-9._-]/_}.json"
+  local out_path="${out_dir%/}/${fname}"
+
+  local owasp
+  owasp="$(fb__json_escape "$FB_OWASP_REF")"
+
+  cat >"$out_path" <<EOF
+{
+  "check_id": "$(fb__json_escape "$FB_CHECK_ID")",
+  "title": "$(fb__json_escape "$FB_TITLE")",
+  "status": "$(fb__json_escape "$FB_STATUS")",
+  "counts": {
+    "errors": ${FB_ERROR_COUNT},
+    "warnings": ${FB_WARNING_COUNT},
+    "notices": ${FB_NOTICE_COUNT}
+  },
+  "owasp_reference": "${owasp}"
+}
+EOF
+}
+
+fb_init() {
+  FB_CHECK_ID="$1"
+  FB_TITLE="$2"
+  FB_OWASP_REF="${3:-}"
+  FB_SEARCHED=""
+  FB_FOUND=""
+  FB_REMEDIATION=""
+  FB_ERROR_COUNT=0
+  FB_WARNING_COUNT=0
+  FB_NOTICE_COUNT=0
+  FB_STATUS="PASS"
+}
+
+fb_add_searched() {
+  local text="$1"
+  FB_SEARCHED+="- ${text}"$'\n'
+}
+
+fb_add_remediation() {
+  local text="$1"
+  if [[ -z "$text" ]]; then
+    return
+  fi
+  FB_REMEDIATION+="- ${text}"$'\n'
+}
+
+fb__annotation() {
+  local severity="$1"
+  local file="$2"
+  local line="$3"
+  local message="$4"
+
+  if [[ -n "$file" && -n "$line" ]]; then
+    echo "::${severity} file=${file},line=${line}::${message}"
+  elif [[ -n "$file" ]]; then
+    echo "::${severity} file=${file}::${message}"
+  else
+    echo "::${severity}::${message}"
+  fi
+}
+
+fb_report() {
+  local severity="$1"
+  local message="$2"
+  local file="${3:-}"
+  local line="${4:-}"
+  local remediation="${5:-}"
+
+  case "$severity" in
+    error) FB_ERROR_COUNT=$((FB_ERROR_COUNT + 1)) ;;
+    warning) FB_WARNING_COUNT=$((FB_WARNING_COUNT + 1)) ;;
+    *) FB_NOTICE_COUNT=$((FB_NOTICE_COUNT + 1)) ;;
+  esac
+
+  fb__annotation "$severity" "$file" "$line" "$message"
+
+  if [[ -n "$file" && -n "$line" ]]; then
+    FB_FOUND+="- [${severity}] ${file}:${line} - ${message}"$'\n'
+  elif [[ -n "$file" ]]; then
+    FB_FOUND+="- [${severity}] ${file} - ${message}"$'\n'
+  else
+    FB_FOUND+="- [${severity}] ${message}"$'\n'
+  fi
+
+  fb_add_remediation "$remediation"
+}
+
+fb_set_status() {
+  FB_STATUS="$1"
+}
+
+fb_set_owasp_ref() {
+  FB_OWASP_REF="$1"
+}
+
+fb_auto_status() {
+  local strict_mode="${1:-false}"
+
+  if [[ "$FB_STATUS" == "SKIPPED" ]]; then
+    return
+  fi
+
+  if [[ $FB_ERROR_COUNT -gt 0 ]]; then
+    FB_STATUS="FAIL"
+    return
+  fi
+
+  if [[ "$strict_mode" == "true" && $FB_WARNING_COUNT -gt 0 ]]; then
+    FB_STATUS="FAIL"
+    return
+  fi
+
+  if [[ $FB_WARNING_COUNT -gt 0 ]]; then
+    FB_STATUS="WARN"
+    return
+  fi
+
+  FB_STATUS="PASS"
+}
+
+fb_summary() {
+  local searched_block="$FB_SEARCHED"
+  local found_block="$FB_FOUND"
+  local remediation_block="$FB_REMEDIATION"
+
+  if [[ -z "$searched_block" ]]; then
+    searched_block="- No explicit search scope provided."$'\n'
+  fi
+  if [[ -z "$found_block" ]]; then
+    found_block="- No findings."$'\n'
+  fi
+  if [[ -z "$remediation_block" ]]; then
+    remediation_block="- No action required."$'\n'
+  fi
+
+  local report
+  report="## ${FB_TITLE} (${FB_CHECK_ID})\n"
+  report+="\n"
+  report+="- Status: **${FB_STATUS}**\n"
+  report+="- Designation: **${FB_CHECK_ID}**\n"
+  if [[ -n "$FB_OWASP_REF" ]]; then
+    report+="- OWASP reference: ${FB_OWASP_REF}\n"
+  fi
+  report+="- Counts: errors=${FB_ERROR_COUNT}, warnings=${FB_WARNING_COUNT}, notices=${FB_NOTICE_COUNT}\n"
+  report+="\n"
+  report+="### Searched\n"
+  report+="${searched_block}"
+  report+="\n"
+  report+="### Found\n"
+  report+="${found_block}"
+  report+="\n"
+  report+="### Remediation\n"
+  report+="${remediation_block}"
+
+  printf "%b\n" "$report"
+
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    printf "%b\n" "$report" >>"$GITHUB_STEP_SUMMARY"
+  fi
+
+  fb_write_result_json
+}
+
+fb_exit_code() {
+  local strict_mode="${1:-false}"
+  local missing_runtime="${2:-false}"
+
+  if [[ "$missing_runtime" == "true" ]]; then
+    echo 2
+    return
+  fi
+
+  if [[ "$FB_STATUS" == "SKIPPED" || "$FB_STATUS" == "PASS" ]]; then
+    echo 0
+    return
+  fi
+
+  if [[ "$FB_STATUS" == "WARN" && "$strict_mode" != "true" ]]; then
+    echo 0
+    return
+  fi
+
+  echo 1
+}

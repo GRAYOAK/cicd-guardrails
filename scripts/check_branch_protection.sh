@@ -1,182 +1,142 @@
 #!/usr/bin/env bash
-# check_branch_protection.sh – CICD-SEC-05
-#
-# Prüft ob der Standard-Branch (main oder master) mit sinnvollen
-# Branch-Protection-Regeln abgesichert ist:
-#
-#   ✔  Pull Request erforderlich (kein direkter Push auf main)
-#   ✔  Mind. 1 Reviewer-Approval (4-Augen-Prinzip)
-#   ✔  force-pushes verboten
-#
-# Benötigt: gh CLI (auf GitHub-hosted Runnern vorinstalliert) + jq
-# Token: Branch-Protection lesen erfordert PAT/App mit Administration-Lesezugriff;
-# das eingebaute Actions-Token reicht dafür in der Regel nicht.
-#
-# Verwendung: bash check_branch_protection.sh [--strict]
-# ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/feedback.sh
+source "${SCRIPT_DIR}/lib/feedback.sh"
 
 STRICT=false
 [[ "${1:-}" == "--strict" ]] && STRICT=true
 
 REPO="${GITHUB_REPOSITORY:-}"
-FAIL=0
+
+fb_init "CICD-SEC-05" "Branch protection policy check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC/"
+fb_add_searched "Default branch metadata for the current repository"
+fb_add_searched "Required pull request reviews and review counts"
+fb_add_searched "Force push, branch deletion, and admin bypass settings"
 
 if [[ -z "$REPO" ]]; then
-  echo "❌ GITHUB_REPOSITORY nicht gesetzt – läuft dieser Script außerhalb von GitHub Actions?"
-  exit 1
+  fb_report "error" "GITHUB_REPOSITORY is not set." "" "" \
+    "Run this check in GitHub Actions with repository context."
+  fb_auto_status "$STRICT"
+  fb_summary
+  exit "$(fb_exit_code "$STRICT" false)"
 fi
 
-gh_error()   { echo "::error::$1";   }
-gh_warning() { echo "::warning::$1"; }
-
-# ── Branch ermitteln (default branch → main/master fallback) ──────────────────
-BRANCH=""
-
-# Prefer default branch from repository metadata. Do not require a separate
-# branches/{name} probe: that endpoint can fail (permissions, transient errors)
-# even when metadata and protection checks work with the same token.
-if REPO_JSON="$(gh api "repos/${REPO}" 2>&1)" && echo "$REPO_JSON" | jq -e . >/dev/null 2>&1; then
-  DEFAULT_BRANCH="$(echo "$REPO_JSON" | jq -r 'if (.default_branch | type) == "string" and (.default_branch | length) > 0 then .default_branch else empty end')"
-  if [[ -n "$DEFAULT_BRANCH" ]]; then
-    BRANCH="$DEFAULT_BRANCH"
-  fi
+if ! command -v gh >/dev/null 2>&1; then
+  fb_report "error" "gh CLI is missing." "" "" "Install gh in the runner image."
+  fb_auto_status "$STRICT"
+  fb_summary
+  exit "$(fb_exit_code "$STRICT" true)"
 fi
 
-# Fallback when metadata is missing or unreadable.
-if [[ -z "$BRANCH" ]]; then
-  for b in main master; do
-    if gh api "repos/${REPO}/branches/${b}" &>/dev/null 2>&1; then
-      BRANCH="$b"
+if ! command -v jq >/dev/null 2>&1; then
+  fb_report "error" "jq is missing." "" "" "Install jq in the runner image."
+  fb_auto_status "$STRICT"
+  fb_summary
+  exit "$(fb_exit_code "$STRICT" true)"
+fi
+
+branch=""
+repo_json=""
+if repo_json="$(gh api "repos/${REPO}" 2>&1)" && echo "$repo_json" | jq -e . >/dev/null 2>&1; then
+  branch="$(echo "$repo_json" | jq -r 'if (.default_branch | type) == "string" and (.default_branch | length) > 0 then .default_branch else empty end')"
+fi
+
+if [[ -z "$branch" ]]; then
+  for candidate in main master; do
+    if gh api "repos/${REPO}/branches/${candidate}" >/dev/null 2>&1; then
+      branch="$candidate"
       break
     fi
   done
 fi
 
-if [[ -z "$BRANCH" ]]; then
-  if [[ -n "${REPO_JSON:-}" ]] && ! echo "$REPO_JSON" | jq -e . >/dev/null 2>&1; then
-    REPO_ERR_SNIP="$(echo "$REPO_JSON" | tr '\n' ' ' | cut -c1-400)"
-    gh_error "GitHub API lieferte keine gültigen Repo-Metadaten (Auth/Netzwerk/Repo?). ${REPO_ERR_SNIP} (CICD-SEC-05)"
-  elif [[ -n "${REPO_JSON:-}" ]] && echo "$REPO_JSON" | jq -e . >/dev/null 2>&1; then
-    MSG="$(echo "$REPO_JSON" | jq -r '.message // empty')"
-    if [[ -n "$MSG" ]]; then
-      gh_error "Repo-Metadaten: ${MSG} (CICD-SEC-05)"
-    else
-      gh_error "Konnte keinen gültigen Standard-Branch im Repository finden (default_branch fehlt?). (CICD-SEC-05)"
-    fi
-  else
-    gh_error "Konnte keinen gültigen Standard-Branch im Repository finden. (CICD-SEC-05)"
-  fi
-  exit 1
+if [[ -z "$branch" ]]; then
+  fb_report "error" "Could not identify a valid default branch." "" "" \
+    "Set a valid default branch and ensure API access to repository metadata."
+  fb_auto_status "$STRICT"
+  fb_summary
+  exit "$(fb_exit_code "$STRICT" false)"
 fi
 
-echo "ℹ️  Prüfe Branch-Protection für: ${REPO}@${BRANCH}"
-
-# ── Protection-Daten abrufen ──────────────────────────────────────────────────
-if ! PROTECTION=$(gh api "repos/${REPO}/branches/${BRANCH}/protection" 2>&1); then
-  # API-Fehler unterscheiden: 404 = keine Protection, 403 = kein Zugriff
-  if echo "$PROTECTION" | grep -q "404"; then
-    gh_error "Branch '${BRANCH}' hat keine Branch-Protection-Regeln. \
-Direkter Push auf '${BRANCH}' ist möglich – kein 4-Augen-Prinzip erzwungen. (CICD-SEC-05)"
-    exit 1
-  elif echo "$PROTECTION" | grep -q "Upgrade to GitHub Pro or make this repository public"; then
-    gh_warning "Branch-Protection-Check übersprungen: Feature für dieses Repository im aktuellen GitHub-Plan nicht verfügbar (private repos benötigen Upgrade)."
-    exit 0
-  elif echo "$PROTECTION" | grep -q "403\|Must have admin rights"; then
-    gh_warning "Branch-Protection-Check übersprungen: Kein Lesezugriff auf Branch-Protection (403). \
-Das eingebaute Actions-Token kann diese API nicht nutzen. \
-Für einen vollständigen Check ein PAT oder GitHub-App-Installations-Token mit Administration-Lesezugriff \
-auf dieses Repository als GH_TOKEN setzen (z. B. als Repository-Secret in GitHub Actions)."
-    exit 0
-  else
-    gh_error "GitHub API Fehler beim Abrufen der Branch-Protection: ${PROTECTION}"
-    exit 1
+if ! protection="$(gh api "repos/${REPO}/branches/${branch}/protection" 2>&1)"; then
+  if echo "$protection" | rg "404" >/dev/null 2>&1; then
+    fb_report "error" "No branch protection rules are configured for '${branch}'." "" "" \
+      "Require pull requests and at least one approval on the default branch."
+    fb_auto_status "$STRICT"
+    fb_summary
+    exit "$(fb_exit_code "$STRICT" false)"
+  elif echo "$protection" | rg "Upgrade to GitHub Pro or make this repository public" >/dev/null 2>&1; then
+    fb_set_status "SKIPPED"
+    fb_report "warning" "Branch protection endpoint unavailable for current repository plan." "" "" \
+      "Use a plan that supports branch protection API checks."
+    fb_summary
+    exit "$(fb_exit_code "$STRICT" false)"
+  elif echo "$protection" | rg "403|Must have admin rights" >/dev/null 2>&1; then
+    fb_set_status "SKIPPED"
+    fb_report "warning" "Token cannot read branch protection rules (403)." "" "" \
+      "Pass admin token with branch protection read access to GH_TOKEN."
+    fb_summary
+    exit "$(fb_exit_code "$STRICT" false)"
   fi
+
+  fb_report "error" "Unexpected GitHub API response while reading branch protection." "" "" \
+    "Inspect API output and token permissions in workflow logs."
+  fb_auto_status "$STRICT"
+  fb_summary
+  exit "$(fb_exit_code "$STRICT" false)"
 fi
 
-# ── 1. Pull Request erforderlich ──────────────────────────────────────────────
-REQUIRED_PR_RAW=$(echo "$PROTECTION" | jq -r '.required_pull_request_reviews // empty')
-
-if [[ -z "$REQUIRED_PR_RAW" ]]; then
-  gh_error "Branch '${BRANCH}': Kein required_pull_request_reviews – \
-direkter Push ohne PR ist erlaubt. Kein 4-Augen-Prinzip möglich. (CICD-SEC-05)"
-  FAIL=1
+required_pr_raw="$(echo "$protection" | jq -r '.required_pull_request_reviews // empty')"
+if [[ -z "$required_pr_raw" ]]; then
+  fb_report "error" "Pull request reviews are not required for '${branch}'." "" "" \
+    "Enable required pull request reviews on the default branch."
 else
-  echo "✅ Pull Request erforderlich"
-
-  # ── 2. Mindestens 1 Reviewer ────────────────────────────────────────────────
-  REQUIRED_COUNT=$(echo "$PROTECTION" \
-    | jq -r '.required_pull_request_reviews.required_approving_review_count // 0')
-
-  if [[ "$REQUIRED_COUNT" -lt 1 ]]; then
-    gh_error "Branch '${BRANCH}': required_approving_review_count=${REQUIRED_COUNT} – \
-Kein 4-Augen-Prinzip. Mindestens 1 Reviewer-Approval erforderlich. (CICD-SEC-05)"
-    FAIL=1
+  required_count="$(echo "$protection" | jq -r '.required_pull_request_reviews.required_approving_review_count // 0')"
+  if [[ "$required_count" -lt 1 ]]; then
+    fb_report "error" "Required approving review count is '${required_count}'." "" "" \
+      "Set required approving review count to at least 1."
   else
-    echo "✅ Mindestens ${REQUIRED_COUNT} Reviewer-Approval(s) erforderlich"
+    fb_report "notice" "Review approval threshold is set to ${required_count}." "" "" \
+      "No remediation needed for review count."
   fi
 
-  # ── 3. Stale Reviews verwerfen (Warning) ────────────────────────────────────
-  DISMISS_STALE=$(echo "$PROTECTION" \
-    | jq -r '.required_pull_request_reviews.dismiss_stale_reviews // false')
-
-  if [[ "$DISMISS_STALE" != "true" ]]; then
-    gh_warning "Branch '${BRANCH}': dismiss_stale_reviews=false – \
-Bestehende Approvals bleiben nach neuem Commit im PR gültig. \
-Empfehlung: 'Dismiss stale pull request approvals when new commits are pushed' aktivieren."
-  else
-    echo "✅ Stale reviews werden verworfen"
+  dismiss_stale="$(echo "$protection" | jq -r '.required_pull_request_reviews.dismiss_stale_reviews // false')"
+  if [[ "$dismiss_stale" != "true" ]]; then
+    fb_report "warning" "Stale pull request approvals are not dismissed automatically." "" "" \
+      "Enable stale approval dismissal for safer review guarantees."
   fi
 
-  # ── 4. Code-Owner Reviews (Info) ────────────────────────────────────────────
-  CODEOWNER=$(echo "$PROTECTION" \
-    | jq -r '.required_pull_request_reviews.require_code_owner_reviews // false')
-
-  if [[ "$CODEOWNER" != "true" ]]; then
-    echo "ℹ️  Code-Owner-Reviews nicht aktiviert (optional, empfohlen für kritische Pfade)"
-  else
-    echo "✅ Code-Owner-Reviews aktiv"
+  codeowner="$(echo "$protection" | jq -r '.required_pull_request_reviews.require_code_owner_reviews // false')"
+  if [[ "$codeowner" != "true" ]]; then
+    fb_report "notice" "Code owner reviews are not required." "" "" \
+      "Enable code owner reviews for critical paths when applicable."
   fi
 fi
 
-# ── 5. Force-Pushes verboten ──────────────────────────────────────────────────
-ALLOW_FORCE=$(echo "$PROTECTION" | jq -r '.allow_force_pushes.enabled // false')
-
-if [[ "$ALLOW_FORCE" == "true" ]]; then
-  gh_error "Branch '${BRANCH}': allow_force_pushes=true – \
-Force-Pushes auf den Hauptbranch erlaubt. Git-History kann überschrieben werden. (CICD-SEC-05)"
-  FAIL=1
-else
-  echo "✅ Force-Pushes verboten"
+allow_force="$(echo "$protection" | jq -r '.allow_force_pushes.enabled // false')"
+if [[ "$allow_force" == "true" ]]; then
+  fb_report "error" "Force pushes are allowed on '${branch}'." "" "" \
+    "Disable force pushes on the default branch."
 fi
 
-# ── 6. Branch-Löschung verboten (Warning) ────────────────────────────────────
-ALLOW_DELETE=$(echo "$PROTECTION" | jq -r '.allow_deletions.enabled // false')
-
-if [[ "$ALLOW_DELETE" == "true" ]]; then
-  gh_warning "Branch '${BRANCH}': allow_deletions=true – \
-Der Hauptbranch kann gelöscht werden."
-else
-  echo "✅ Branch-Löschung verboten"
+allow_delete="$(echo "$protection" | jq -r '.allow_deletions.enabled // false')"
+if [[ "$allow_delete" == "true" ]]; then
+  fb_report "warning" "Branch deletion is allowed on '${branch}'." "" "" \
+    "Disable branch deletion for protected default branch."
 fi
 
-# ── 7. Admins unterliegen den Regeln ─────────────────────────────────────────
-ENFORCE_ADMINS=$(echo "$PROTECTION" | jq -r '.enforce_admins.enabled // false')
-
-if [[ "$ENFORCE_ADMINS" != "true" ]]; then
-  gh_warning "Branch '${BRANCH}': enforce_admins=false – \
-Repository-Admins können Branch-Protection-Regeln umgehen. \
-Empfehlung: 'Do not allow bypassing the above settings' aktivieren."
-else
-  echo "✅ Branch-Protection gilt auch für Admins"
+enforce_admins="$(echo "$protection" | jq -r '.enforce_admins.enabled // false')"
+if [[ "$enforce_admins" != "true" ]]; then
+  fb_report "warning" "Admins can bypass branch protection rules." "" "" \
+    "Enable admin enforcement so rules apply to all users."
 fi
 
-# ── Ergebnis ──────────────────────────────────────────────────────────────────
-echo ""
-if [[ $FAIL -ne 0 ]]; then
-  echo "❌ Branch-Protection-Check fehlgeschlagen"
-  exit 1
-else
-  echo "✅ Branch-Protection korrekt konfiguriert"
+fb_auto_status "$STRICT"
+if [[ "$FB_STATUS" == "PASS" ]]; then
+  fb_add_remediation "No remediation needed."
 fi
+fb_summary
+exit "$(fb_exit_code "$STRICT" false)"

@@ -1,7 +1,7 @@
 name: CI/CD Security Full Scan
 
 # ─────────────────────────────────────────────────────────────────────────────
-# REUSABLE WORKFLOW – aufrufbar von anderen Repos via:
+# REUSABLE WORKFLOW – callable from other repos via:
 #
 #   jobs:
 #     guardrails:
@@ -9,9 +9,9 @@ name: CI/CD Security Full Scan
 #       with:
 #         strict: true
 #
-# Der Guardrails-SHA wird aus GITHUB_WORKFLOW_REF geparst – das ist der Ref
-# mit dem dieser Workflow aufgerufen wurde (z.B. @f878a48...).
-# So stimmen Workflow-Definition und Skripte immer überein.
+# The guardrails SHA is parsed from GITHUB_WORKFLOW_REF – the exact ref used
+# when this reusable workflow was invoked (for example @f878a48...).
+# This keeps workflow definition and scripts in sync.
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -19,14 +19,14 @@ on:
     inputs:
       strict:
         description: >
-          true  = Build schlägt bei jedem Fund fehl (empfohlen).
-          false = Findings als Annotations, Build bleibt grün (Migrationsmodus).
+          true  = Fail the job on any finding (recommended).
+          false = Emit findings as annotations while keeping the job green (migration mode).
         type: boolean
         default: true
       skip-checks:
         description: >
-          Kommagetrennte Liste von Check-IDs die übersprungen werden.
-          Gültige Werte: check-prt, check-action-pinning, check-permissions,
+          Comma-separated list of check IDs to skip.
+          Valid values: check-prt, check-action-pinning, check-permissions,
           check-dependency-pins, check-secrets, check-runner-config,
           check-branch-protection
         type: string
@@ -42,7 +42,7 @@ permissions:
 
 jobs:
 
-  # ── Setup: Guardrails-SHA aus Workflow-Ref extrahieren ────────────────────
+  # ── Setup: extract guardrails ref from workflow call ─────────────────────
   setup:
     name: 'Setup'
     runs-on: ubuntu-latest
@@ -51,7 +51,7 @@ jobs:
     outputs:
       guardrails-ref: ${{ steps.ref.outputs.ref }}
     steps:
-      - name: Guardrails-Ref aus GITHUB_WORKFLOW_REF ermitteln
+      - name: Extract guardrails ref from GITHUB_WORKFLOW_REF
         id: ref
         # GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/file.yml@<SHA>"
         # Nach dem letzten @ ist der exakte Ref mit dem dieser Workflow aufgerufen wurde
@@ -59,6 +59,52 @@ jobs:
           REF="${GITHUB_WORKFLOW_REF##*@}"
           echo "ref=$REF" >> $GITHUB_OUTPUT
           echo "Guardrails-Ref: $REF"
+
+  # ── Result aggregation ────────────────────────────────────────────────────
+  summarize:
+    name: '📊 Risk summary'
+    needs:
+      - setup
+      - check-prt
+      - check-action-pinning
+      - check-permissions
+      - check-dependency-pins
+      - check-secrets
+      - check-runner-config
+      - check-branch-protection
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          path: target
+
+      - name: Checkout guardrails scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          repository: Christopher-Rust/cicd-guardrails
+          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          path: guardrails
+
+      - name: Download check artifacts (best-effort)
+        uses: actions/download-artifact@0b2256b8c1f6f3b9fdf5d0ed2a2a2e4c3f88fba2
+        continue-on-error: true
+        with:
+          path: guardrails-results
+
+      - name: Install yq (for .guardrails.yml)
+        run: |
+          YQ_VERSION="v4.45.1"
+          BASE="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}"
+          curl -sSL -o yq "${BASE}/yq_linux_amd64"
+          chmod +x yq
+          sudo mv yq /usr/local/bin/yq
+
+      - name: Generate risk summary
+        run: bash guardrails/scripts/aggregate_risk_summary.sh target guardrails-results
 
   # ── 1. pull_request_target ────────────────────────────────────────────────
   check-prt:
@@ -69,12 +115,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout aufrufendes Repo
+      - name: Checkout caller repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           path: target
 
-      - name: Checkout Guardrails-Skripte
+      - name: Checkout guardrails scripts
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           repository: Christopher-Rust/cicd-guardrails
@@ -82,6 +128,16 @@ jobs:
           path: guardrails
 
       - run: bash guardrails/scripts/check_prt.sh target
+        env:
+          GUARDRAILS_RESULT_DIR: guardrails-results
+
+      - name: Upload results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b4b15b8e8db8f3c77b6c694cbb6c2d19f6dc3a2b
+        with:
+          name: guardrails-results-check-prt
+          path: guardrails-results/*.json
+          if-no-files-found: ignore
 
   # ── 2. Action SHA-Pinning ─────────────────────────────────────────────────
   check-action-pinning:
@@ -103,10 +159,20 @@ jobs:
           path: guardrails
 
       - run: bash guardrails/scripts/check_pinning.sh target
+        env:
+          GUARDRAILS_RESULT_DIR: guardrails-results
 
-  # ── 3. Workflow-Permissions ───────────────────────────────────────────────
+      - name: Upload results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b4b15b8e8db8f3c77b6c694cbb6c2d19f6dc3a2b
+        with:
+          name: guardrails-results-check-action-pinning
+          path: guardrails-results/*.json
+          if-no-files-found: ignore
+
+  # ── 3. Workflow permissions ───────────────────────────────────────────────
   check-permissions:
-    name: '🔐 Workflow-Permissions'
+    name: '🔐 Workflow permissions'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'check-permissions') }}
     runs-on: ubuntu-latest
@@ -124,6 +190,16 @@ jobs:
           path: guardrails
 
       - run: bash guardrails/scripts/check_permissions.sh target
+        env:
+          GUARDRAILS_RESULT_DIR: guardrails-results
+
+      - name: Upload results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b4b15b8e8db8f3c77b6c694cbb6c2d19f6dc3a2b
+        with:
+          name: guardrails-results-check-permissions
+          path: guardrails-results/*.json
+          if-no-files-found: ignore
 
   # ── 4. Dependency Lock Files ──────────────────────────────────────────────
   check-dependency-pins:
@@ -145,8 +221,18 @@ jobs:
           path: guardrails
 
       - run: bash guardrails/scripts/check_lockfiles.sh target
+        env:
+          GUARDRAILS_RESULT_DIR: guardrails-results
 
-  # ── 5. Secret Scanning ────────────────────────────────────────────────────
+      - name: Upload results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b4b15b8e8db8f3c77b6c694cbb6c2d19f6dc3a2b
+        with:
+          name: guardrails-results-check-dependency-pins
+          path: guardrails-results/*.json
+          if-no-files-found: ignore
+
+  # ── 5. Secret scanning ────────────────────────────────────────────────────
   check-secrets:
     name: '🕵️ Secret Scanning (gitleaks)'
     needs: setup
@@ -158,8 +244,15 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 0
+          path: target
 
-      - name: Installiere gitleaks
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          repository: Christopher-Rust/cicd-guardrails
+          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          path: guardrails
+
+      - name: Install gitleaks
         run: |
           GITLEAKS_VERSION="8.21.2"
           BASE="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
@@ -168,12 +261,22 @@ jobs:
           grep "linux_x64.tar.gz" checksums.txt | sha256sum -c
           tar xzf gitleaks.tar.gz gitleaks
 
-      - name: Scanne auf Secrets
-        run: ./gitleaks detect --source . --exit-code 1 --redact
+      - name: Scan for secrets
+        run: bash guardrails/scripts/check_secrets.sh target
+        env:
+          GUARDRAILS_RESULT_DIR: guardrails-results
 
-  # ── 6. Runner-Konfiguration ───────────────────────────────────────────────
+      - name: Upload results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b4b15b8e8db8f3c77b6c694cbb6c2d19f6dc3a2b
+        with:
+          name: guardrails-results-check-secrets
+          path: guardrails-results/*.json
+          if-no-files-found: ignore
+
+  # ── 6. Runner configuration ───────────────────────────────────────────────
   check-runner-config:
-    name: '🖥️ Runner-Konfiguration'
+    name: '🖥️ Runner configuration'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'check-runner-config') }}
     runs-on: ubuntu-latest
@@ -191,6 +294,16 @@ jobs:
           path: guardrails
 
       - run: bash guardrails/scripts/check_runner_config.sh target ${{ inputs.strict && '--strict' || '' }}
+        env:
+          GUARDRAILS_RESULT_DIR: guardrails-results
+
+      - name: Upload results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b4b15b8e8db8f3c77b6c694cbb6c2d19f6dc3a2b
+        with:
+          name: guardrails-results-check-runner-config
+          path: guardrails-results/*.json
+          if-no-files-found: ignore
 
   # ── 7. Branch Protection ──────────────────────────────────────────────────
   check-branch-protection:
@@ -212,7 +325,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
           GUARDRAILS_HAS_ADMIN_SECRET: ${{ secrets['admin-token'] != '' }}
+          GUARDRAILS_RESULT_DIR: guardrails-results
 
       - run: bash guardrails/scripts/check_branch_protection.sh ${{ inputs.strict && '--strict' || '' }}
         env:
           GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
+          GUARDRAILS_RESULT_DIR: guardrails-results
+
+      - name: Upload results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b4b15b8e8db8f3c77b6c694cbb6c2d19f6dc3a2b
+        with:
+          name: guardrails-results-check-branch-protection
+          path: guardrails-results/*.json
+          if-no-files-found: ignore

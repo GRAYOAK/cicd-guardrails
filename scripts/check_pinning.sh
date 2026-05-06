@@ -1,74 +1,63 @@
 #!/usr/bin/env bash
-# OWASP CICD-SEC-08: Ungoverned Usage of 3rd-Party Services
-#
-# Prüft ob alle `uses:`-Referenzen auf einen vollen 40-stelligen SHA gepinnt sind.
-# Lehnt @v1, @main, @latest und fehlendes @ ab.
-# Ignoriert lokale Actions (./path/to/action).
-#
-# Exit 0 = alle Actions korrekt gepinnt
-# Exit 1 = unpinnde Actions gefunden
 
 set -euo pipefail
 
-PATH_ROOT="${1:-.}"
-FAIL=0
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/feedback.sh
+source "${SCRIPT_DIR}/lib/feedback.sh"
 
-gh_error() { echo "::error file=${1},line=${2}::${3}"; }
+PATH_ROOT="${1:-.}"
+
+fb_init "CICD-SEC-08" "Action pinning check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"
+fb_add_searched "Workflow and composite action files"
+fb_add_searched "uses: references that are not pinned to a full 40-char SHA"
+fb_add_searched "Disallowed refs such as tags, branches, latest, or missing @"
 
 shopt -s nullglob
-files=(
-  "$PATH_ROOT"/.github/workflows/*.yml
-  "$PATH_ROOT"/.github/workflows/*.yaml
-  "$PATH_ROOT"/actions/**/action.yml
-  "$PATH_ROOT"/actions/**/action.yaml
-)
+files=("$PATH_ROOT"/.github/workflows/*.yml "$PATH_ROOT"/.github/workflows/*.yaml)
+while IFS= read -r action_file; do
+  files+=("$action_file")
+done < <(find "$PATH_ROOT/actions" -type f \\( -name "action.yml" -o -name "action.yaml" \\) 2>/dev/null || true)
 
 if [[ ${#files[@]} -eq 0 ]]; then
-  echo "ℹ️  Keine Workflow-/Action-Dateien gefunden."
-  exit 0
+  fb_set_status "SKIPPED"
+  fb_add_remediation "No workflow or action files found; no action required."
+  fb_summary
+  exit "$(fb_exit_code false false)"
 fi
 
 for file in "${files[@]}"; do
   rel="${file#"$PATH_ROOT/"}"
 
-  # Pro Zeile:
-  #   1. Kommentarzeilen überspringen
-  #   2. Inline-Kommentar entfernen (für die Analyse)
-  #   3. `uses:`-Zeilen filtern
-  #   4. Lokale Actions (./...) überspringen
-  #   5. SHA-gepinnte (@<40 hex>) überspringen
-  #   6. Rest = unpinnd → ausgeben
-  findings=$(awk '
+  findings="$(awk '
     /^[[:space:]]*#/ { next }
     {
       line = $0
       sub(/#.*$/, "", line)
       if (line !~ /uses:/) next
-      if (line ~ /uses:[[:space:]]*\.\//) next     # lokale Action
-      if (line ~ /@[0-9a-f]{40}[[:space:]]*$/) next  # SHA gepinnt
+      if (line ~ /uses:[[:space:]]*\.\//) next
+      if (line ~ /@[0-9a-f]{40}[[:space:]]*$/) next
       print NR ": " $0
     }
-  ' "$file")
+  ' "$file")"
 
   if [[ -n "$findings" ]]; then
-    echo "❌ $rel"
     while IFS= read -r match; do
       linenum="${match%%:*}"
-      ref=$(echo "$match" | grep -o 'uses:.*' | sed 's/uses:[[:space:]]*//')
-      echo "   $match"
-      gh_error "$rel" "$linenum" "Unpinnde Action '$ref' – SHA-Pinning verwenden (OWASP CICD-SEC-08)"
-    done <<< "$findings"
-    echo ""
-    FAIL=1
+      ref="$(echo "$match" | sed -E 's/^[0-9]+:[[:space:]]*//' | sed -E 's/.*uses:[[:space:]]*//')"
+      fb_report "error" "Unpinned action reference '${ref}'." "$rel" "$linenum" \
+        "Pin every third-party action to a full commit SHA."
+    done <<<"$findings"
   fi
 done
 
-if [[ $FAIL -eq 0 ]]; then
-  echo "✅ PASS: Alle Actions auf vollständige SHA gepinnt."
+fb_auto_status false
+if [[ "$FB_STATUS" != "PASS" ]]; then
+  fb_add_remediation "Example: uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"
+  fb_add_remediation "Use automation to keep pinned SHAs updated."
 else
-  echo "FIX: uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2"
-  echo "     SHA ermitteln: git ls-remote https://github.com/actions/checkout refs/tags/v4"
-  echo "     Automatisch: Dependabot mit package-ecosystem: github-actions"
+  fb_add_remediation "No remediation needed."
 fi
 
-exit $FAIL
+fb_summary
+exit "$(fb_exit_code false false)"

@@ -105,6 +105,32 @@ jobs:
       skip-checks: 'check-secrets,check-runner-config'
 ```
 
+### 5. Risiko-Kontext über `.guardrails.yml` steuern
+
+Der finale Job `📊 Risk summary` liest optional eine Datei `.guardrails.yml` im Ziel-Repo
+und gewichtet Findings kontextabhängig (z. B. public vs private, self-hosted vs GitHub-hosted).
+
+Beispiel:
+
+```yaml
+# .guardrails.yml
+context:
+  visibility: public              # public | private | internal
+  software_type: open_source      # open_source | private_software
+  runner_type: self_hosted        # self_hosted | github_hosted
+  data_sensitivity: high          # low | medium | high
+  deployment_criticality: prod    # dev | prod | regulated
+```
+
+Wie die Werte einfließen:
+
+- `visibility=public` erhöht Risiko-Gewichtung für `CICD-SEC-04`, `CICD-SEC-06`, `CICD-SEC-08`
+- `software_type=open_source` gewichtet Supply-Chain/Exposure höher
+- `runner_type=self_hosted` gewichtet Runner-/Hardening-Themen höher
+- `data_sensitivity=high` und `deployment_criticality=prod|regulated` erhöhen Priorität für Secrets, Permissions und Runner-Kontrollen
+
+Fehlt die Datei, nutzt Guardrails konservative Defaults und schreibt das transparent ins Summary.
+
 ---
 
 ## Repo-Struktur
