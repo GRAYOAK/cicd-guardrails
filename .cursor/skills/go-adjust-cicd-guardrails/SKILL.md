@@ -27,6 +27,7 @@ Use this skill for changes in:
 - Learnings added to this skill must be generalized.
 - Do not store one-off incident details or transient version timelines.
 - Exception: keep repository-specific facts when they are structural and stable (tasks, folders, files, and required packages).
+- Proactively propose better alternative implementation concepts when they materially improve reliability, security, maintainability, or operability.
 - Keep per-check summary blocks consistent:
   - `Searched`
   - `Found`
@@ -56,20 +57,21 @@ Renaming any of these layers is a breaking change for consumers (status checks, 
 ## Required workflow for changes
 
 1. Inspect affected scripts and workflow wiring.
-2. Update shared behavior in `scripts/lib/feedback.sh` first when possible.
-3. Propagate to check scripts with minimal duplication.
-4. Ensure reusable workflow still uploads/downstreams artifacts expected by summary jobs.
-5. Update docs for any behavior change (`README.md`).
-6. Document the current software state in `workspace:Main`.
-7. Run tests and sanity checks:
+2. Evaluate at least one viable alternative approach and explicitly recommend the better option when trade-offs are meaningful.
+3. Update shared behavior in `scripts/lib/feedback.sh` first when possible.
+4. Propagate to check scripts with minimal duplication.
+5. Ensure reusable workflow still uploads/downstreams artifacts expected by summary jobs.
+6. Update docs for any behavior change (`README.md`).
+7. Document the current software state in `workspace:Main`.
+8. Run tests and sanity checks:
    - `bash ./tests/test_checks.sh`
    - lints/diagnostics for edited files
-8. Run a bash-and-workflow quality review with a dedicated subagent after tests pass:
+9. Run a bash-and-workflow quality review with a dedicated subagent after tests pass:
    - Specialist scope: bash scripting and GitHub Actions workflow design.
    - Review focus: best practices, security weaknesses, reliability risks, and maintainability issues.
    - Required output: prioritized findings with severity, concrete remediation guidance, and whether changes are blocking.
    - If findings are actionable, apply fixes and rerun tests/sanity checks before continuing.
-9. Run a skill-structure review with a dedicated skill-specialist subagent before finalizing:
+10. Run a skill-structure review with a dedicated skill-specialist subagent before finalizing:
    - Goal: decide whether this skill should be split into multiple files and/or multiple focused skills.
    - Scope: responsibilities, section size, coupling, reuse potential, and maintenance overhead.
    - Output: explicit recommendation with rationale:
@@ -77,7 +79,7 @@ Renaming any of these layers is a breaking change for consumers (status checks, 
      - split into multiple files within one skill
      - split into multiple standalone skills
    - If split is recommended, include a proposed target structure and migration order.
-10. Always finish with a learning proposal block that the user can accept or reject per item.
+11. Always finish with a learning proposal block that the user can accept or reject per item.
 
 ## Reference files
 
