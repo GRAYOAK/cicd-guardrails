@@ -53,7 +53,7 @@ done
 
 fb_auto_status false
 if [[ "$FB_STATUS" != "PASS" ]]; then
-  fb_add_remediation "Example: uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"
+  fb_add_remediation "Example: uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd"
   fb_add_remediation "Use automation to keep pinned SHAs updated."
 else
   fb_add_remediation "No remediation needed."

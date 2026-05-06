@@ -101,7 +101,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 EOF
 run_check check_prt.sh "$TMP" || true
 assert_exit "ignoriert pull_request_target in Inline-Kommentar" 0 "$LAST_EXIT"
@@ -134,7 +134,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
       - uses: ./actions/my-local-action
 EOF
 run_check check_pinning.sh "$TMP" || true
