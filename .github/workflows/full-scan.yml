@@ -26,23 +26,15 @@ on:
       skip-checks:
         description: >
           Comma-separated list of check IDs to skip.
-          Valid values: check-prt, check-action-pinning, check-permissions,
-          check-dependency-pins, check-secrets, check-flow-control,
-          check-pbac-branch-policy, check-runner-access, check-runner-hardening
+          Valid values: cicd-sec-01-flow, cicd-sec-03, cicd-sec-04,
+          cicd-sec-05-branch, cicd-sec-05-permissions, cicd-sec-05-runner-access,
+          cicd-sec-06, cicd-sec-07-runner-hardening, cicd-sec-08
         type: string
         default: ''
     secrets:
       admin-token:
         description: >
           PAT used for branch-protection verification and check.
-        required: false
-      app-id:
-        description: >
-          Optional GitHub App identifier to mint admin token in-job.
-        required: false
-      app-private-key:
-        description: >
-          Optional GitHub App private key to mint admin token in-job.
         required: false
 
 permissions:
@@ -62,7 +54,7 @@ jobs:
       - name: Extract guardrails ref from GITHUB_WORKFLOW_REF
         id: ref
         # GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/file.yml@<SHA>"
-        # Nach dem letzten @ ist der exakte Ref mit dem dieser Workflow aufgerufen wurde
+        # After the last @ is the exact ref used to invoke this workflow.
         run: |
           REF="${GITHUB_WORKFLOW_REF##*@}"
           echo "ref=$REF" >> $GITHUB_OUTPUT
@@ -73,15 +65,15 @@ jobs:
     name: '📊 Risk summary'
     needs:
       - setup
-      - check-prt
-      - check-action-pinning
-      - check-permissions
-      - check-dependency-pins
-      - check-secrets
-      - check-flow-control
-      - check-pbac-branch-policy
-      - check-runner-access
-      - check-runner-hardening
+      - cicd-sec-04
+      - cicd-sec-08
+      - cicd-sec-05-permissions
+      - cicd-sec-03
+      - cicd-sec-06
+      - cicd-sec-01-flow
+      - cicd-sec-05-branch
+      - cicd-sec-05-runner-access
+      - cicd-sec-07-runner-hardening
     if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
@@ -116,11 +108,11 @@ jobs:
       - name: Generate risk summary
         run: bash guardrails/scripts/aggregate_risk_summary.sh target guardrails-results
 
-  # ── 1. pull_request_target ────────────────────────────────────────────────
-  check-prt:
-    name: '🚨 pull_request_target'
+  # ── CICD-SEC-04: pull_request_target ──────────────────────────────────────
+  cicd-sec-04:
+    name: '🚨 CICD-SEC-04 (pull_request_target)'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'check-prt') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-04') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -137,7 +129,7 @@ jobs:
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/check_prt.sh target
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_04.sh target
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -145,15 +137,15 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-check-prt
+          name: guardrails-results-cicd-sec-04
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── 2. Action SHA-Pinning ─────────────────────────────────────────────────
-  check-action-pinning:
-    name: '📌 Action SHA-Pinning'
+  # ── CICD-SEC-08: Action SHA-Pinning ───────────────────────────────────────
+  cicd-sec-08:
+    name: '📌 CICD-SEC-08 (Action SHA-Pinning)'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'check-action-pinning') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-08') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -168,7 +160,7 @@ jobs:
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/check_pinning.sh target
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_08.sh target
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -176,15 +168,15 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-check-action-pinning
+          name: guardrails-results-cicd-sec-08
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── 3. Workflow permissions ───────────────────────────────────────────────
-  check-permissions:
-    name: '🔐 Workflow permissions'
+  # ── CICD-SEC-05-PERMISSIONS: Workflow permissions ─────────────────────────
+  cicd-sec-05-permissions:
+    name: '🔐 CICD-SEC-05-PERMISSIONS (Workflow permissions)'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'check-permissions') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-05-permissions') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -199,7 +191,7 @@ jobs:
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/check_permissions.sh target
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_05_permissions.sh target
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -207,15 +199,15 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-check-permissions
+          name: guardrails-results-cicd-sec-05-permissions
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── 4. Dependency Lock Files ──────────────────────────────────────────────
-  check-dependency-pins:
-    name: '🔒 Dependency Lock Files'
+  # ── CICD-SEC-03: Dependency Lock Files ────────────────────────────────────
+  cicd-sec-03:
+    name: '🔒 CICD-SEC-03 (Dependency Lock Files)'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'check-dependency-pins') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-03') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -230,7 +222,7 @@ jobs:
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/check_lockfiles.sh target
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_03.sh target
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -238,15 +230,15 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-check-dependency-pins
+          name: guardrails-results-cicd-sec-03
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── 5. Secret scanning ────────────────────────────────────────────────────
-  check-secrets:
-    name: '🕵️ Secret Scanning (gitleaks)'
+  # ── CICD-SEC-06: Secret scanning ──────────────────────────────────────────
+  cicd-sec-06:
+    name: '🕵️ CICD-SEC-06 (Secret Scanning)'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'check-secrets') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-06') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -272,7 +264,7 @@ jobs:
           tar xzf gitleaks.tar.gz gitleaks
 
       - name: Scan for secrets
-        run: bash guardrails/scripts/check_secrets.sh target
+        run: bash guardrails/scripts/checks/domain/cicd_sec_06.sh target
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -280,15 +272,15 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-check-secrets
+          name: guardrails-results-cicd-sec-06
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── 6. Flow control ───────────────────────────────────────────────────────
-  check-flow-control:
-    name: '🧭 Flow control'
+  # ── CICD-SEC-01-FLOW: Flow control ────────────────────────────────────────
+  cicd-sec-01-flow:
+    name: '🧭 CICD-SEC-01-FLOW (Flow control)'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'check-flow-control') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-01-flow') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -303,68 +295,24 @@ jobs:
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
-      - name: Create admin token from GitHub App
-        if: ${{ !secrets['admin-token'] && secrets['app-id'] && secrets['app-private-key'] }}
-        id: app-token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349  # v2
-        with:
-          app-id: ${{ secrets['app-id'] }}
-          private-key: ${{ secrets['app-private-key'] }}
-
-      - run: bash guardrails/scripts/checks/domain/check_flow_control.sh ${{ inputs.strict && '--strict' || '' }}
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_01_flow.sh target ${{ inputs.strict && '--strict' || '' }}
         env:
-          GH_TOKEN: ${{ secrets['admin-token'] || steps.app-token.outputs.token || github.token }}
+          GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
           GUARDRAILS_RESULT_DIR: guardrails-results
 
       - name: Upload results
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-check-flow-control
+          name: guardrails-results-cicd-sec-01-flow
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── 7. Branch governance and PBAC ─────────────────────────────────────────
-  check-pbac-branch-policy:
-    name: '🛂 Branch governance and PBAC'
+  # ── CICD-SEC-05-BRANCH: Branch governance and PBAC ────────────────────────
+  cicd-sec-05-branch:
+    name: '🛂 CICD-SEC-05-BRANCH (Branch governance and PBAC)'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'check-pbac-branch-policy') }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
-        with:
-          repository: Christopher-Rust/cicd-guardrails
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
-          path: guardrails
-
-      - name: Create admin token from GitHub App
-        if: ${{ !secrets['admin-token'] && secrets['app-id'] && secrets['app-private-key'] }}
-        id: app-token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349  # v2
-        with:
-          app-id: ${{ secrets['app-id'] }}
-          private-key: ${{ secrets['app-private-key'] }}
-
-      - run: bash guardrails/scripts/checks/domain/check_pbac_branch_policy.sh ${{ inputs.strict && '--strict' || '' }}
-        env:
-          GH_TOKEN: ${{ secrets['admin-token'] || steps.app-token.outputs.token || github.token }}
-          GUARDRAILS_RESULT_DIR: guardrails-results
-
-      - name: Upload results
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: guardrails-results-check-pbac-branch-policy
-          path: guardrails-results/*.json
-          if-no-files-found: ignore
-
-  # ── 8. Runner access policy ───────────────────────────────────────────────
-  check-runner-access:
-    name: '🖥️ Runner access policy'
-    needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'check-runner-access') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-05-branch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -379,34 +327,39 @@ jobs:
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/check_runner_access.sh target ${{ inputs.strict && '--strict' || '' }}
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_05_branch.sh target ${{ inputs.strict && '--strict' || '' }}
         env:
+          GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
           GUARDRAILS_RESULT_DIR: guardrails-results
 
       - name: Upload results
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-check-runner-access
+          name: guardrails-results-cicd-sec-05-branch
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── 9. Runner hardening ───────────────────────────────────────────────────
-  check-runner-hardening:
-    name: '🧱 Runner hardening'
+  # ── CICD-SEC-05-RUNNER-ACCESS: Runner access policy ───────────────────────
+  cicd-sec-05-runner-access:
+    name: '🖥️ CICD-SEC-05-RUNNER-ACCESS (Runner access policy)'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'check-runner-hardening') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-05-runner-access') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
+          path: target
+
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
+        with:
           repository: Christopher-Rust/cicd-guardrails
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/check_runner_hardening.sh target ${{ inputs.strict && '--strict' || '' }}
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_05_runner_access.sh target ${{ inputs.strict && '--strict' || '' }}
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -414,6 +367,37 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-check-runner-hardening
+          name: guardrails-results-cicd-sec-05-runner-access
+          path: guardrails-results/*.json
+          if-no-files-found: ignore
+
+  # ── CICD-SEC-07-RUNNER-HARDENING: Runner hardening ────────────────────────
+  cicd-sec-07-runner-hardening:
+    name: '🧱 CICD-SEC-07-RUNNER-HARDENING (Runner hardening)'
+    needs: setup
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-07-runner-hardening') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
+        with:
+          path: target
+
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
+        with:
+          repository: Christopher-Rust/cicd-guardrails
+          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          path: guardrails
+
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_07_runner_hardening.sh target ${{ inputs.strict && '--strict' || '' }}
+        env:
+          GUARDRAILS_RESULT_DIR: guardrails-results
+
+      - name: Upload results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: guardrails-results-cicd-sec-07-runner-hardening
           path: guardrails-results/*.json
           if-no-files-found: ignore

@@ -2,39 +2,22 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/config.sh
+source "${SCRIPT_DIR}/lib/config.sh"
+
 TARGET_DIR="${1:-target}"
 RESULTS_DIR="${2:-guardrails-results}"
 
-CONFIG_PATH="${TARGET_DIR}/.guardrails.yml"
+cfg_init "$TARGET_DIR"
+CONFIG_PATH="$CFG_PATH"
 
-read_config() {
-  local key="$1"
-  local default="$2"
-
-  if [[ ! -f "$CONFIG_PATH" ]]; then
-    echo "$default"
-    return
-  fi
-
-  if ! command -v yq >/dev/null 2>&1; then
-    echo "$default"
-    return
-  fi
-
-  local val
-  val="$(yq -r "$key // \"\"" "$CONFIG_PATH" 2>/dev/null || true)"
-  if [[ -z "$val" || "$val" == "null" ]]; then
-    echo "$default"
-  else
-    echo "$val"
-  fi
-}
-
-visibility="$(read_config '.context.visibility' 'unknown')"
-software_type="$(read_config '.context.software_type' 'unknown')"
-runner_type="$(read_config '.context.runner_type' 'unknown')"
-data_sensitivity="$(read_config '.context.data_sensitivity' 'unknown')"
-deployment_criticality="$(read_config '.context.deployment_criticality' 'unknown')"
+visibility="$(cfg_context '.context.visibility' 'unknown')"
+software_type="$(cfg_context '.context.software_type' 'unknown')"
+runner_type="$(cfg_context '.context.runner_type' 'unknown')"
+container_registry="$(cfg_context '.context.container_registry' 'unknown')"
+data_sensitivity="$(cfg_context '.context.data_sensitivity' 'unknown')"
+deployment_criticality="$(cfg_context '.context.deployment_criticality' 'unknown')"
 
 base_score() {
   case "$1" in
@@ -42,9 +25,10 @@ base_score() {
     CICD-SEC-04*) echo 90 ;;  # poisoned pipeline
     CICD-SEC-01*) echo 85 ;;  # flow control
     CICD-SEC-05-VERIFY*) echo 30 ;; # verifier, not the control itself
+    CICD-SEC-05-PERMISSIONS*) echo 80 ;; # workflow permissions (PBAC)
     CICD-SEC-05-BRANCH*|CICD-SEC-05-RUNNER-ACCESS*) echo 80 ;;  # branch governance and runner access
     CICD-SEC-07*|CICD-SEC-07-RUNNER-HARDENING*) echo 70 ;; # runner hardening
-    CICD-SEC-05*) echo 80 ;;  # permissions / pbac default
+    CICD-SEC-05*) echo 80 ;;  # any other PBAC variant
     CICD-SEC-08*) echo 60 ;;  # third-party pinning
     CICD-SEC-03*) echo 40 ;;  # dependency lockfiles
     *) echo 25 ;;
@@ -85,6 +69,21 @@ context_multiplier_pct() {
     github_hosted)
       case "$check_id" in
         CICD-SEC-07*|CICD-SEC-05-RUNNER-ACCESS*) pct=$((pct - 10)) ;;
+      esac
+      ;;
+  esac
+
+  case "$container_registry" in
+    public)
+      case "$check_id" in
+        CICD-SEC-08*) pct=$((pct + 15)) ;;
+        CICD-SEC-06*) pct=$((pct + 10)) ;;
+        CICD-SEC-04*) pct=$((pct + 5)) ;;
+      esac
+      ;;
+    private_network)
+      case "$check_id" in
+        CICD-SEC-08*) pct=$((pct - 5)) ;;
       esac
       ;;
   esac
@@ -201,6 +200,7 @@ print_summary() {
   out+="  - visibility: \`${visibility}\`\n"
   out+="  - software_type: \`${software_type}\`\n"
   out+="  - runner_type: \`${runner_type}\`\n"
+  out+="  - container_registry: \`${container_registry}\`\n"
   out+="  - data_sensitivity: \`${data_sensitivity}\`\n"
   out+="  - deployment_criticality: \`${deployment_criticality}\`\n"
 
@@ -231,18 +231,24 @@ if [[ ${#best_effort_results[@]} -eq 0 ]]; then
 fi
 
 rows=()
+softened_count=0
 for file in "${best_effort_results[@]}"; do
   check_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["check_id"])' "$file")"
   title="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["title"])' "$file")"
   status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$file")"
   owasp="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("owasp_reference",""))' "$file")"
+  mode="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("mode","fail"))' "$file")"
+
+  if [[ "$mode" == "warn" || "$mode" == "off" ]]; then
+    softened_count=$((softened_count + 1))
+  fi
 
   b="$(base_score "$check_id")"
   m="$(context_multiplier_pct "$check_id")"
   w="$(status_weight_pct "$status")"
   score=$(( b * m * w / 10000 ))
 
-  rows+=("${score}"$'\t'"${check_id}"$'\t'"${status}"$'\t'"${title}"$'\t'"${owasp}")
+  rows+=("${score}"$'\t'"${check_id}"$'\t'"${status}"$'\t'"${title}"$'\t'"${owasp}"$'\t'"${mode}")
 done
 
 IFS=$'\n' sorted=($(printf "%s\n" "${rows[@]}" | sort -nr -k1,1))
@@ -264,7 +270,9 @@ for r in "${sorted[@]}"; do
   status="${rest%%$'\t'*}"
   rest="${rest#*$'\t'}"
   title="${rest%%$'\t'*}"
-  owasp="${rest#*$'\t'}"
+  rest="${rest#*$'\t'}"
+  owasp="${rest%%$'\t'*}"
+  mode="${rest#*$'\t'}"
 
   if [[ "$score" -le 0 ]]; then
     continue
@@ -278,6 +286,9 @@ for r in "${sorted[@]}"; do
   reference_label="$(owasp_label "$check_id")"
   entry="1. **${check_id}** — ${title}\n"
   entry+="   - Status: \`${status}\`\n"
+  if [[ -n "$mode" && "$mode" != "fail" ]]; then
+    entry+="   - Mode: \`${mode}\` (configured override in .guardrails.yml)\n"
+  fi
   entry+="   - Risk score: \`${score}\`\n"
   entry+="   - Problem: ${problem}\n"
   entry+="   - Exploit path: ${exploit}\n"
@@ -309,7 +320,13 @@ for r in "${sorted[@]}"; do
   esac
 done
 
-list="- Executive snapshot: Critical \`${critical_count}\` | High \`${high_count}\` | Medium \`${medium_count}\`\n\n"
+list="- Executive snapshot: Critical \`${critical_count}\` | High \`${high_count}\` | Medium \`${medium_count}\`\n"
+
+if [[ "$softened_count" -gt 0 ]]; then
+  list+="- Note: \`${softened_count}\` check(s) ran with a per-check override (mode=warn or mode=off) and have been deescalated accordingly.\n"
+fi
+
+list+="\n"
 
 if [[ -n "$critical" ]]; then
   list+="#### Critical\n${critical}\n"

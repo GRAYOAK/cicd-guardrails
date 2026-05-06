@@ -3,14 +3,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=scripts/lib/feedback.sh
-source "${SCRIPT_DIR}/lib/feedback.sh"
+source "${ROOT_SCRIPTS_DIR}/lib/feedback.sh"
+# shellcheck source=scripts/lib/config.sh
+source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
 
 PATH_ROOT="${1:-.}"
 WORKFLOWS_DIR="${PATH_ROOT}/.github/workflows"
 MISSING_RUNTIME=false
 
-fb_init "CICD-SEC-05" "Workflow permissions check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC/"
+fb_init "CICD-SEC-05-PERMISSIONS" "Workflow permissions check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC/"
+cfg_init "$PATH_ROOT"
+fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
 fb_add_searched "Top-level permissions block in each workflow file"
 fb_add_searched "Job-level permissions block for each job"
 

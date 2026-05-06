@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${ROOT_SCRIPTS_DIR}/lib/feedback.sh"
+source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
 source "${ROOT_SCRIPTS_DIR}/checks/tech/workflow_runner_scan.sh"
 
 PATH_ROOT="${1:-.}"
@@ -12,6 +13,8 @@ STRICT=false
 [[ "${2:-}" == "--strict" ]] && STRICT=true
 
 fb_init "CICD-SEC-07-RUNNER-HARDENING" "Runner hardening check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-07-Insecure-System-Configuration/"
+cfg_init "$PATH_ROOT"
+fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
 fb_add_searched "Privileged container options in workflow jobs"
 fb_add_searched "Use of sudo in workflow run steps"
 

@@ -2,12 +2,24 @@
 
 ## Add a new check
 
-1. Create `scripts/check_<name>.sh` using `feedback.sh` helpers.
-2. Set `fb_init` with check ID, title, OWASP URL.
-3. Add to `full-scan.yml` job list and artifact upload.
-4. Include in final summary dependencies and prioritization rules.
-5. Add tests in `tests/test_checks.sh` and fixture updates.
-6. Update README check table and usage notes.
+1. Create `scripts/checks/domain/cicd_sec_<NR>[_<aspect>].sh` using `feedback.sh` and `config.sh` helpers. Source pattern:
+   ```bash
+   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+   ROOT_SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+   source "${ROOT_SCRIPTS_DIR}/lib/feedback.sh"
+   source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
+   ```
+2. After `fb_init "<DESIGNATION>" ...`, always wire the override:
+   ```bash
+   cfg_init "$PATH_ROOT"
+   fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
+   ```
+3. Add a job to `full-scan.yml` with the matching kebab-case ID (`cicd-sec-<nr>[-aspect]`) and a designation-led display name. Include the target checkout, the script invocation, and the artifact upload.
+4. Add the new job to the `summarize` job's `needs:` list and to the `skip-checks` description so consumers can disable it.
+5. Register the new designation as a property under `checks` in `.guardrails.schema.json` so IDE validation accepts overrides for it.
+6. Extend `aggregate_risk_summary.sh` (`base_score`, `context_multiplier_pct`, `derive_*`) with deterministic patterns; place specific designations before generic catch-alls.
+7. Add tests in `tests/test_checks.sh` covering designation, exit semantics, and at least one mode override case where realistic.
+8. Update README check table and usage notes; mirror in the consumer demo `.guardrails.yml` if behavior is user-facing.
 
 ## Modify summary format
 

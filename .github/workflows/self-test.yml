@@ -21,38 +21,38 @@ jobs:
       - run: bash tests/test_checks.sh
 
   # ── Dogfood these checks on this repo ─────────────────────────────────────
-  self-check-prt:
-    name: 'Self-Check: pull_request_target'
+  self-cicd-sec-04:
+    name: 'Self-Check: CICD-SEC-04 (pull_request_target)'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
-      - run: bash scripts/check_prt.sh .
+      - run: bash scripts/checks/domain/cicd_sec_04.sh .
 
-  self-check-pinning:
-    name: 'Self-Check: Action SHA-Pinning'
+  self-cicd-sec-08:
+    name: 'Self-Check: CICD-SEC-08 (Action SHA-Pinning)'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
-      - run: bash scripts/check_pinning.sh .
+      - run: bash scripts/checks/domain/cicd_sec_08.sh .
 
-  self-check-permissions:
-    name: 'Self-Check: Workflow permissions'
+  self-cicd-sec-05-permissions:
+    name: 'Self-Check: CICD-SEC-05-PERMISSIONS (Workflow permissions)'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
-      - run: bash scripts/check_permissions.sh .
+      - run: bash scripts/checks/domain/cicd_sec_05_permissions.sh .
 
-  self-check-lockfiles:
-    name: 'Self-Check: Dependency Lock Files'
+  self-cicd-sec-03:
+    name: 'Self-Check: CICD-SEC-03 (Dependency Lock Files)'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
-      - run: bash scripts/check_lockfiles.sh .
+      - run: bash scripts/checks/domain/cicd_sec_03.sh .

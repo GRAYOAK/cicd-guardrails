@@ -1,6 +1,20 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Christopher-Rust/cicd-guardrails/main/.guardrails.schema.json
+
 context:
   visibility: public
   software_type: open_source
   runner_type: self_hosted
+  container_registry: public
   data_sensitivity: medium
   deployment_criticality: dev
+
+# Optional: per-check severity overrides for staged rollout.
+# Default mode is 'fail' if a check is omitted.
+#   fail = exit non-zero on findings (job turns red)
+#   warn = report findings, keep job green (migration mode)
+#   off  = skip the check entirely (use sparingly)
+checks:
+  CICD-SEC-06:
+    mode: fail
+  CICD-SEC-08:
+    mode: warn

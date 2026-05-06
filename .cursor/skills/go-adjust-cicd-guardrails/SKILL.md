@@ -9,8 +9,10 @@ disable-model-invocation: true
 ## Scope
 
 Use this skill for changes in:
-- `scripts/check_*.sh`
+- `scripts/checks/domain/cicd_sec_*.sh` (domain checks)
+- `scripts/checks/tech/*.sh` (technical adapters)
 - `scripts/lib/feedback.sh`
+- `scripts/lib/config.sh`
 - `scripts/aggregate_risk_summary.sh`
 - `.guardrails.schema.json`
 - `.guardrails.example.yml`
@@ -30,6 +32,19 @@ Use this skill for changes in:
   - `Found`
   - `Remediation`
 - Include check designation and OWASP reference in summaries.
+
+## Naming convention (single source of truth)
+
+The OWASP designation is the identity for every check. Keep all four layers in sync when adding or renaming checks:
+
+- **Skript filename**: `scripts/checks/domain/cicd_sec_<NR>[_<aspect>].sh` in snake_case lowercase (e.g. `cicd_sec_05_runner_access.sh`).
+- **Workflow job ID**: kebab-case mirror of the filename (e.g. `cicd-sec-05-runner-access`). Used by `skip-checks` input.
+- **Display name**: leads with the designation, e.g. `'🖥️ CICD-SEC-05-RUNNER-ACCESS (Runner access policy)'`. Used as required-status-check name on the consumer side.
+- **FB_CHECK_ID**: the designation in upper case, identical to the keys allowed in `.guardrails.yml` `checks:` block (e.g. `CICD-SEC-05-RUNNER-ACCESS`).
+
+When several checks belong to the same OWASP family, use a clear suffix (e.g. `CICD-SEC-05-PERMISSIONS`, `CICD-SEC-05-BRANCH`, `CICD-SEC-05-RUNNER-ACCESS`); avoid the bare family ID for a single sub-aspect.
+
+Renaming any of these layers is a breaking change for consumers (status checks, `skip-checks` inputs). Document the mapping in `README.md` and propagate to the demo repo's `.guardrails.yml` if relevant.
 
 ## Required workflow for changes
 
@@ -67,6 +82,7 @@ Use this skill for changes in:
 - `reference-risk-model.md`:
   - risk summary and context model
   - `.guardrails.yml` expected fields and schema linkage
+  - per-check severity override pattern (`checks: { <DESIGNATION>: { mode: fail|warn|off } }`)
 - `playbooks.md`:
   - common change patterns and consumer wiring rules
 - `learnings.md`:
@@ -75,7 +91,7 @@ Use this skill for changes in:
 
 Load-on-demand triggers:
 - For runtime policy, output format, or exit code changes, read `reference-policies.md`.
-- For scoring or context-weighting changes, read `reference-risk-model.md`.
+- For scoring, context-weighting, or per-check override changes, read `reference-risk-model.md`.
 - For implementation path decisions, read `playbooks.md`.
 - For final chat output and skill updates based on learnings, read `learnings.md`.
 

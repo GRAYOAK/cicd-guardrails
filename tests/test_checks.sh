@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPTS_DIR="${ROOT_DIR}/scripts"
+DOMAIN_DIR="${SCRIPTS_DIR}/checks/domain"
 FIXTURES_DIR="${ROOT_DIR}/tests/fixtures"
 PASS=0
 FAIL=0
@@ -61,43 +62,64 @@ PY
   rm -f "$output_file"
 }
 
+write_guardrails_yml() {
+  local target_dir="$1"
+  local mode="$2"
+  local check_id="$3"
+  local registry="${4:-public}"
+  cat > "$target_dir/.guardrails.yml" <<EOF
+context:
+  visibility: public
+  software_type: open_source
+  runner_type: github_hosted
+  container_registry: ${registry}
+  data_sensitivity: medium
+  deployment_criticality: dev
+checks:
+  ${check_id}:
+    mode: ${mode}
+EOF
+}
+
 echo ""
-echo "▶ check_prt.sh"
+echo "▶ cicd_sec_04.sh"
 setup
 cp "$FIXTURES_DIR/bad-prt.yml" "$TMP/.github/workflows/ci.yml"
-run_check "$SCRIPTS_DIR/check_prt.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_04.sh" "$TMP"
 assert_exit "detects pull_request_target usage" 1 "$LAST_EXIT"
 assert_output_contains "includes Searched block" "### Searched"
 assert_output_contains "includes Found block" "### Found"
 assert_output_contains "includes Remediation block" "### Remediation"
+assert_output_contains "renders Mode line" "Mode: **fail**"
 teardown
 
 echo ""
-echo "▶ check_pinning.sh"
+echo "▶ cicd_sec_08.sh"
 setup
 cp "$FIXTURES_DIR/bad-pinning.yml" "$TMP/.github/workflows/ci.yml"
-run_check "$SCRIPTS_DIR/check_pinning.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_08.sh" "$TMP"
 assert_exit "detects unpinned action references" 1 "$LAST_EXIT"
 teardown
 
 echo ""
-echo "▶ check_permissions.sh"
+echo "▶ cicd_sec_05_permissions.sh"
 setup
 cp "$FIXTURES_DIR/good-workflow.yml" "$TMP/.github/workflows/ci.yml"
-run_check "$SCRIPTS_DIR/check_permissions.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_05_permissions.sh" "$TMP"
 assert_exit "passes for valid permissions blocks" 0 "$LAST_EXIT"
+assert_output_contains "uses CICD-SEC-05-PERMISSIONS designation" "CICD-SEC-05-PERMISSIONS"
 teardown
 
 echo ""
-echo "▶ check_lockfiles.sh"
+echo "▶ cicd_sec_03.sh"
 setup
 echo '{"name":"demo"}' > "$TMP/package.json"
-run_check "$SCRIPTS_DIR/check_lockfiles.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
 assert_exit "fails when npm lockfile is missing" 1 "$LAST_EXIT"
 teardown
 
 echo ""
-echo "▶ check_runner_access.sh"
+echo "▶ cicd_sec_05_runner_access.sh"
 setup
 cat > "$TMP/.github/workflows/ci.yml" <<'EOF'
 name: Test
@@ -117,13 +139,13 @@ fi
 exit 0
 EOF
 chmod +x "$TMP/bin/yq"
-PATH="$TMP/bin:$PATH" run_check "$SCRIPTS_DIR/checks/domain/check_runner_access.sh" "$TMP"
+PATH="$TMP/bin:$PATH" run_check "$DOMAIN_DIR/cicd_sec_05_runner_access.sh" "$TMP"
 assert_exit "warns about generic self-hosted labels" 0 "$LAST_EXIT"
 assert_output_contains "uses SEC-05 runner access designation" "CICD-SEC-05-RUNNER-ACCESS"
 teardown
 
 echo ""
-echo "▶ check_runner_hardening.sh"
+echo "▶ cicd_sec_07_runner_hardening.sh"
 setup
 cat > "$TMP/.github/workflows/ci.yml" <<'EOF'
 name: Test
@@ -146,13 +168,13 @@ fi
 exit 0
 EOF
 chmod +x "$TMP/bin/yq"
-PATH="$TMP/bin:$PATH" run_check "$SCRIPTS_DIR/checks/domain/check_runner_hardening.sh" "$TMP"
+PATH="$TMP/bin:$PATH" run_check "$DOMAIN_DIR/cicd_sec_07_runner_hardening.sh" "$TMP"
 assert_exit "fails on privileged runner configuration" 1 "$LAST_EXIT"
 assert_output_contains "uses SEC-07 hardening designation" "CICD-SEC-07-RUNNER-HARDENING"
 teardown
 
 echo ""
-echo "▶ check_flow_control.sh"
+echo "▶ cicd_sec_01_flow.sh"
 setup
 cat > "$TMP/bin/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -186,13 +208,13 @@ if 'enforce_admins.enabled' in q: print(str(d.get('enforce_admins',{}).get('enab
 print('')"
 EOF
 chmod +x "$TMP/bin/gh" "$TMP/bin/jq"
-PATH="$TMP/bin:$PATH" GITHUB_REPOSITORY="example/repo" run_check "$SCRIPTS_DIR/checks/domain/check_flow_control.sh"
+PATH="$TMP/bin:$PATH" GITHUB_REPOSITORY="example/repo" run_check "$DOMAIN_DIR/cicd_sec_01_flow.sh"
 assert_exit "fails on weak flow controls" 1 "$LAST_EXIT"
 assert_output_contains "uses SEC-01 flow designation" "CICD-SEC-01-FLOW"
 teardown
 
 echo ""
-echo "▶ check_pbac_branch_policy.sh"
+echo "▶ cicd_sec_05_branch.sh"
 setup
 cat > "$TMP/bin/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -225,26 +247,90 @@ if 'enforce_admins.enabled' in q: print(str(d.get('enforce_admins',{}).get('enab
 print('')"
 EOF
 chmod +x "$TMP/bin/gh" "$TMP/bin/jq"
-PATH="$TMP/bin:$PATH" GITHUB_REPOSITORY="example/repo" run_check "$SCRIPTS_DIR/checks/domain/check_pbac_branch_policy.sh"
+PATH="$TMP/bin:$PATH" GITHUB_REPOSITORY="example/repo" run_check "$DOMAIN_DIR/cicd_sec_05_branch.sh"
 assert_exit "reports branch policy findings with deterministic designation" 1 "$LAST_EXIT"
 assert_output_contains "uses SEC-05 branch designation" "CICD-SEC-05-BRANCH"
 teardown
+
+# ── Per-check severity override (mode warn / off) ─────────────────────────
+if command -v yq >/dev/null 2>&1; then
+  echo ""
+  echo "▶ cicd_sec_03.sh with mode=warn"
+  setup
+  echo '{"name":"demo"}' > "$TMP/package.json"
+  write_guardrails_yml "$TMP" "warn" "CICD-SEC-03"
+  run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+  assert_exit "warn override keeps job green" 0 "$LAST_EXIT"
+  assert_output_contains "renders Mode warn" "Mode: **warn**"
+  assert_output_contains "renders WARN status" "Status: **WARN**"
+  teardown
+
+  echo ""
+  echo "▶ cicd_sec_03.sh with mode=off"
+  setup
+  echo '{"name":"demo"}' > "$TMP/package.json"
+  write_guardrails_yml "$TMP" "off" "CICD-SEC-03"
+  run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+  assert_exit "off override keeps job green" 0 "$LAST_EXIT"
+  assert_output_contains "renders Mode off" "Mode: **off**"
+  assert_output_contains "renders SKIPPED status" "Status: **SKIPPED**"
+  teardown
+else
+  echo ""
+  echo "▶ skipping mode override tests (yq not available)"
+fi
 
 echo ""
 echo "▶ aggregate_risk_summary.sh"
 setup
 mkdir -p "$TMP/target" "$TMP/results"
 cat > "$TMP/results/CICD-SEC-01-FLOW.json" <<'EOF'
-{"check_id":"CICD-SEC-01-FLOW","title":"Flow control policy check","status":"FAIL","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-01-Insufficient-Flow-Control-Mechanisms/"}
+{"check_id":"CICD-SEC-01-FLOW","title":"Flow control policy check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-01-Insufficient-Flow-Control-Mechanisms/"}
 EOF
 cat > "$TMP/results/CICD-SEC-07-RUNNER-HARDENING.json" <<'EOF'
-{"check_id":"CICD-SEC-07-RUNNER-HARDENING","title":"Runner hardening check","status":"FAIL","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-07-Insecure-System-Configuration/"}
+{"check_id":"CICD-SEC-07-RUNNER-HARDENING","title":"Runner hardening check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-07-Insecure-System-Configuration/"}
 EOF
 run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results"
 assert_exit "returns exit 0 for summary output" 0 "$LAST_EXIT"
 assert_output_contains "prints executive snapshot" "Executive snapshot:"
 assert_output_contains "includes OWASP short reference labels" "[OWASP CICD-SEC-01-FLOW]"
+assert_output_contains "lists container_registry context" "container_registry:"
 teardown
+
+if command -v yq >/dev/null 2>&1; then
+  echo ""
+  echo "▶ aggregate_risk_summary.sh with container_registry=public"
+  setup
+  mkdir -p "$TMP/target" "$TMP/results"
+  cat > "$TMP/target/.guardrails.yml" <<'EOF'
+context:
+  visibility: public
+  software_type: open_source
+  runner_type: github_hosted
+  container_registry: public
+  data_sensitivity: medium
+  deployment_criticality: dev
+EOF
+  cat > "$TMP/results/CICD-SEC-08.json" <<'EOF'
+{"check_id":"CICD-SEC-08","title":"Action pinning check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"}
+EOF
+  run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results"
+  assert_exit "summary completes with public registry" 0 "$LAST_EXIT"
+  assert_output_contains "shows public container_registry" "container_registry: \`public\`"
+  teardown
+
+  echo ""
+  echo "▶ aggregate_risk_summary.sh shows softened-mode note"
+  setup
+  mkdir -p "$TMP/target" "$TMP/results"
+  cat > "$TMP/results/CICD-SEC-08.json" <<'EOF'
+{"check_id":"CICD-SEC-08","title":"Action pinning check","status":"WARN","mode":"warn","counts":{"errors":0,"warnings":1,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"}
+EOF
+  run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results"
+  assert_exit "summary completes with softened check" 0 "$LAST_EXIT"
+  assert_output_contains "shows mode override note" "per-check override"
+  teardown
+fi
 
 echo ""
 echo "═══════════════════════════════════════"
@@ -252,4 +338,3 @@ echo "  $PASS passed  |  $FAIL failed"
 echo "═══════════════════════════════════════"
 
 [[ $FAIL -eq 0 ]] || exit 1
-

@@ -12,6 +12,7 @@ FB_WARNING_COUNT=0
 FB_NOTICE_COUNT=0
 FB_STATUS="PASS"
 FB_OWASP_REF=""
+FB_MODE="fail"
 
 fb__json_escape() {
   local s="${1:-}"
@@ -41,6 +42,7 @@ fb_write_result_json() {
   "check_id": "$(fb__json_escape "$FB_CHECK_ID")",
   "title": "$(fb__json_escape "$FB_TITLE")",
   "status": "$(fb__json_escape "$FB_STATUS")",
+  "mode": "$(fb__json_escape "$FB_MODE")",
   "counts": {
     "errors": ${FB_ERROR_COUNT},
     "warnings": ${FB_WARNING_COUNT},
@@ -62,6 +64,7 @@ fb_init() {
   FB_WARNING_COUNT=0
   FB_NOTICE_COUNT=0
   FB_STATUS="PASS"
+  FB_MODE="fail"
 }
 
 fb_add_searched() {
@@ -151,7 +154,44 @@ fb_auto_status() {
   FB_STATUS="PASS"
 }
 
+# Record the per-check severity override read from .guardrails.yml.
+# The actual status mutation happens automatically inside fb_summary so that
+# every exit path (early SKIPPED, missing runtime, normal flow) honors it
+# without scattering the override logic across check scripts.
+# Allowed modes: fail (default) | warn | off.
+fb_set_mode() {
+  local mode="${1:-fail}"
+
+  case "$mode" in
+    fail|warn|off) FB_MODE="$mode" ;;
+    *) FB_MODE="fail" ;;
+  esac
+}
+
+# Apply the recorded mode to the current status and counts. Idempotent.
+# warn: downgrade FAIL to WARN, rebucket error counts as warnings.
+# off:  report SKIPPED with zero counts; emitted annotations remain visible.
+fb_apply_check_mode() {
+  case "$FB_MODE" in
+    warn)
+      if [[ "$FB_STATUS" == "FAIL" ]]; then
+        FB_STATUS="WARN"
+        FB_WARNING_COUNT=$((FB_WARNING_COUNT + FB_ERROR_COUNT))
+        FB_ERROR_COUNT=0
+      fi
+      ;;
+    off)
+      FB_STATUS="SKIPPED"
+      FB_ERROR_COUNT=0
+      FB_WARNING_COUNT=0
+      FB_NOTICE_COUNT=0
+      ;;
+  esac
+}
+
 fb_summary() {
+  fb_apply_check_mode
+
   local searched_block="$FB_SEARCHED"
   local found_block="$FB_FOUND"
   local remediation_block="$FB_REMEDIATION"
@@ -170,6 +210,7 @@ fb_summary() {
   report="## ${FB_TITLE} (${FB_CHECK_ID})\n"
   report+="\n"
   report+="- Status: **${FB_STATUS}**\n"
+  report+="- Mode: **${FB_MODE}**\n"
   report+="- Designation: **${FB_CHECK_ID}**\n"
   if [[ -n "$FB_OWASP_REF" ]]; then
     report+="- OWASP reference: ${FB_OWASP_REF}\n"
@@ -198,12 +239,25 @@ fb_exit_code() {
   local strict_mode="${1:-false}"
   local missing_runtime="${2:-false}"
 
+  # mode=off disables the check entirely, including infrastructure failures.
+  if [[ "$FB_MODE" == "off" ]]; then
+    echo 0
+    return
+  fi
+
   if [[ "$missing_runtime" == "true" ]]; then
     echo 2
     return
   fi
 
   if [[ "$FB_STATUS" == "SKIPPED" || "$FB_STATUS" == "PASS" ]]; then
+    echo 0
+    return
+  fi
+
+  # Per-check severity override takes precedence over the workflow-wide
+  # strict input so that staged rollouts via .guardrails.yml work as intended.
+  if [[ "$FB_MODE" == "warn" ]]; then
     echo 0
     return
   fi

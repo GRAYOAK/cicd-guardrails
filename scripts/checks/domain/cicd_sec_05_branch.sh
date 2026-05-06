@@ -5,16 +5,26 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${ROOT_SCRIPTS_DIR}/lib/feedback.sh"
+source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
 source "${ROOT_SCRIPTS_DIR}/checks/tech/github_branch_protection_api.sh"
 
+PATH_ROOT="."
 STRICT=false
-[[ "${1:-}" == "--strict" ]] && STRICT=true
+for arg in "$@"; do
+  case "$arg" in
+    --strict) STRICT=true ;;
+    -*) ;;
+    *) PATH_ROOT="$arg" ;;
+  esac
+done
 REPO="${GITHUB_REPOSITORY:-}"
 
-fb_init "CICD-SEC-01-FLOW" "Flow control policy check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-01-Insufficient-Flow-Control-Mechanisms/"
-fb_add_searched "Default branch metadata for the current repository"
-fb_add_searched "Required pull request reviews and review counts"
-fb_add_searched "Force push and branch deletion settings"
+fb_init "CICD-SEC-05-BRANCH" "Branch governance and PBAC check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC/"
+cfg_init "$PATH_ROOT"
+fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
+fb_add_searched "Admin enforcement in branch protection settings"
+fb_add_searched "Stale approval invalidation policy"
+fb_add_searched "Code owner review requirements"
 
 if [[ -z "$REPO" ]]; then
   fb_report "error" "GITHUB_REPOSITORY is not set." "" "" \
@@ -43,7 +53,7 @@ fi
 if ! protection="$(ghbp_read_protection "$REPO" "$branch")"; then
   if echo "$protection" | rg "404" >/dev/null 2>&1; then
     fb_report "error" "No branch protection rules are configured for '${branch}'." "" "" \
-      "Require pull requests and at least one approval on the default branch."
+      "Enable branch protection and apply policy controls to the default branch."
     fb_auto_status "$STRICT"
     fb_summary
     exit "$(fb_exit_code "$STRICT" false)"
@@ -60,7 +70,6 @@ if ! protection="$(ghbp_read_protection "$REPO" "$branch")"; then
     fb_summary
     exit "$(fb_exit_code "$STRICT" false)"
   fi
-
   fb_report "error" "Unexpected GitHub API response while reading branch protection." "" "" \
     "Inspect API output and token permissions in workflow logs."
   fb_auto_status "$STRICT"
@@ -68,31 +77,22 @@ if ! protection="$(ghbp_read_protection "$REPO" "$branch")"; then
   exit "$(fb_exit_code "$STRICT" false)"
 fi
 
-required_pr_raw="$(echo "$protection" | jq -r '.required_pull_request_reviews // empty')"
-if [[ -z "$required_pr_raw" ]]; then
-  fb_report "error" "Pull request reviews are not required for '${branch}'." "" "" \
-    "Enable required pull request reviews on the default branch."
-else
-  required_count="$(echo "$protection" | jq -r '.required_pull_request_reviews.required_approving_review_count // 0')"
-  if [[ "$required_count" -lt 1 ]]; then
-    fb_report "error" "Required approving review count is '${required_count}'." "" "" \
-      "Set required approving review count to at least 1."
-  else
-    fb_report "notice" "Review approval threshold is set to ${required_count}." "" "" \
-      "No remediation needed for review count."
-  fi
+dismiss_stale="$(echo "$protection" | jq -r '.required_pull_request_reviews.dismiss_stale_reviews // false')"
+if [[ "$dismiss_stale" != "true" ]]; then
+  fb_report "warning" "Stale pull request approvals are not dismissed automatically." "" "" \
+    "Enable stale approval dismissal for safer review guarantees."
 fi
 
-allow_force="$(echo "$protection" | jq -r '.allow_force_pushes.enabled // false')"
-if [[ "$allow_force" == "true" ]]; then
-  fb_report "error" "Force pushes are allowed on '${branch}'." "" "" \
-    "Disable force pushes on the default branch."
+codeowner="$(echo "$protection" | jq -r '.required_pull_request_reviews.require_code_owner_reviews // false')"
+if [[ "$codeowner" != "true" ]]; then
+  fb_report "notice" "Code owner reviews are not required." "" "" \
+    "Enable code owner reviews for critical paths when applicable."
 fi
 
-allow_delete="$(echo "$protection" | jq -r '.allow_deletions.enabled // false')"
-if [[ "$allow_delete" == "true" ]]; then
-  fb_report "warning" "Branch deletion is allowed on '${branch}'." "" "" \
-    "Disable branch deletion for protected default branch."
+enforce_admins="$(echo "$protection" | jq -r '.enforce_admins.enabled // false')"
+if [[ "$enforce_admins" != "true" ]]; then
+  fb_report "warning" "Admins can bypass branch protection rules." "" "" \
+    "Enable admin enforcement so rules apply to all users."
 fi
 
 fb_auto_status "$STRICT"

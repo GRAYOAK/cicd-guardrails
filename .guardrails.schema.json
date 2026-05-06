@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Christopher-Rust/cicd-guardrails/main/.guardrails.schema.json",
-  "title": "Guardrails Context Schema",
-  "description": "Schema for .guardrails.yml context values.",
+  "title": "Guardrails Configuration Schema",
+  "description": "Schema for .guardrails.yml. Drives risk scoring context and per-check severity overrides.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,6 +16,7 @@
         "visibility",
         "software_type",
         "runner_type",
+        "container_registry",
         "data_sensitivity",
         "deployment_criticality"
       ],
@@ -35,6 +36,11 @@
           "enum": ["self_hosted", "github_hosted"],
           "description": "Primary GitHub Actions runner model."
         },
+        "container_registry": {
+          "type": "string",
+          "enum": ["public", "private_network"],
+          "description": "Primary container registry source for builds and deployments. Public sources increase supply-chain risk weighting."
+        },
         "data_sensitivity": {
           "type": "string",
           "enum": ["low", "medium", "high"],
@@ -44,6 +50,35 @@
           "type": "string",
           "enum": ["dev", "prod", "regulated"],
           "description": "Operational criticality and governance level of deployments."
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional per-check severity overrides. Default mode is 'fail'. Use 'warn' or 'off' for staged rollout.",
+      "properties": {
+        "CICD-SEC-01-FLOW": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-03": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-04": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-05-PERMISSIONS": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-05-BRANCH": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-05-RUNNER-ACCESS": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-06": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-07-RUNNER-HARDENING": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-08": { "$ref": "#/$defs/checkOverride" }
+      }
+    }
+  },
+  "$defs": {
+    "checkOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["fail", "warn", "off"],
+          "description": "fail = exit non-zero on findings (default). warn = report findings but keep job green. off = skip the check entirely."
         }
       }
     }

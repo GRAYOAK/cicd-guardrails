@@ -3,12 +3,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=scripts/lib/feedback.sh
-source "${SCRIPT_DIR}/lib/feedback.sh"
+source "${ROOT_SCRIPTS_DIR}/lib/feedback.sh"
+# shellcheck source=scripts/lib/config.sh
+source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
 
 PATH_ROOT="${1:-.}"
 
 fb_init "CICD-SEC-08" "Action pinning check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"
+cfg_init "$PATH_ROOT"
+fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
 fb_add_searched "Workflow and composite action files"
 fb_add_searched "uses: references that are not pinned to a full 40-char SHA"
 fb_add_searched "Disallowed refs such as tags, branches, latest, or missing @"

@@ -6,6 +6,10 @@
 - `1`: actionable failure
 - `2`: missing runtime dependency
 
+Per-check overrides interact with these codes:
+- `mode=warn`: findings keep job at exit 0; missing runtime still returns 2 so infrastructure problems remain visible.
+- `mode=off`: forces exit 0 even when runtime dependencies are missing; treat as full deactivation.
+
 ## Engineering principles
 
 - Keep domain logic and technical execution separate:
@@ -31,9 +35,9 @@
 ## Output contract for checks
 
 Each check should produce:
-- GitHub annotations (`error`/`warning`/`notice`) for findings
-- Step summary with designation, OWASP reference, status counts
-- JSON result artifact (when `GUARDRAILS_RESULT_DIR` is set) for final aggregation
+- GitHub annotations (`error`/`warning`/`notice`) for findings (emitted live, before any mode override is applied)
+- Step summary with designation, OWASP reference, status, mode, and counts
+- JSON result artifact (when `GUARDRAILS_RESULT_DIR` is set) for final aggregation, including `status` and `mode` fields so the aggregator can surface softened checks
 
 ## GitHub Actions runtime policy
 

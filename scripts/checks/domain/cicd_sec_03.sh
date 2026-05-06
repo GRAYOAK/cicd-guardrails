@@ -3,12 +3,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=scripts/lib/feedback.sh
-source "${SCRIPT_DIR}/lib/feedback.sh"
+source "${ROOT_SCRIPTS_DIR}/lib/feedback.sh"
+# shellcheck source=scripts/lib/config.sh
+source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
 
 PATH_ROOT="${1:-.}"
 
 fb_init "CICD-SEC-03" "Dependency pinning and lockfile check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse/"
+cfg_init "$PATH_ROOT"
+fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
 fb_add_searched "Manifest files for npm, python, ruby, rust, go, and php"
 fb_add_searched "Presence of required lockfiles next to each manifest"
 fb_add_searched "Pinned python requirements using =="
