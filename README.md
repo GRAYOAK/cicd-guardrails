@@ -46,36 +46,33 @@ permissions:
   contents: read
 
 jobs:
-  # GitHub App Token für check-branch-protection generieren.
-  # Voraussetzung: GitHub App mit Administration:Read installiert +
-  # Secrets APP_ID und APP_PRIVATE_KEY im Repo hinterlegt.
-  generate-token:
-    name: 'App Token generieren'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      token: ${{ steps.app-token.outputs.token }}
-    steps:
-      - uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a  # v2.1.0
-        id: app-token
-        with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PRIVATE_KEY }}
-
   guardrails:
-    needs: generate-token
     uses: Christopher-Rust/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
     #                                                                        ^^^^^
     #               Immer auf vollständigen SHA pinnen – nie @main oder @v1!
     with:
       strict: true
     secrets:
-      admin-token: ${{ needs.generate-token.outputs.token }}
+      app-id: ${{ secrets.APP_ID }}
+      app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
-> **Ohne GitHub App:** Den `generate-token` Job weglassen und `secrets:` Block entfernen.
-> Die Branch-basierten Checks (`check-flow-control`, `check-pbac-branch-policy`) können ohne Admin-Token skipped oder eingeschränkt sein.
+> **Alternative ohne GitHub App:** `admin-token` als klassisches Secret übergeben.
+>
+> ```yaml
+> jobs:
+>   guardrails:
+>     uses: YOUR_ORG/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
+>     with:
+>       strict: true
+>     secrets:
+>       admin-token: ${{ secrets.GUARDRAILS_ADMIN_TOKEN }}
+> ```
+>
+> Für JavaScript-basierte Actions nur Node24-kompatible Revisionen verwenden und weiterhin auf vollständige Commit-SHAs pinnen.
+>
+> Wird weder `admin-token` noch ein GitHub-App-Secret-Paar (`app-id` + `app-private-key`) übergeben,
+> können branch-basierte Checks eingeschränkt sein oder Warnungen ausgeben.
 > Alle file-basierten Checks laufen normal weiter.
 
 ### 3. Branch Protection konfigurieren (PRs blockieren)

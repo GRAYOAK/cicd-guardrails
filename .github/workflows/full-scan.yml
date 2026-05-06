@@ -36,6 +36,14 @@ on:
         description: >
           PAT used for branch-protection verification and check.
         required: false
+      app-id:
+        description: >
+          Optional GitHub App identifier to mint admin token in-job.
+        required: false
+      app-private-key:
+        description: >
+          Optional GitHub App private key to mint admin token in-job.
+        required: false
 
 permissions:
   contents: read
@@ -295,9 +303,17 @@ jobs:
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
+      - name: Create admin token from GitHub App
+        if: ${{ !secrets['admin-token'] && secrets['app-id'] && secrets['app-private-key'] }}
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349  # v2
+        with:
+          app-id: ${{ secrets['app-id'] }}
+          private-key: ${{ secrets['app-private-key'] }}
+
       - run: bash guardrails/scripts/checks/domain/check_flow_control.sh ${{ inputs.strict && '--strict' || '' }}
         env:
-          GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
+          GH_TOKEN: ${{ secrets['admin-token'] || steps.app-token.outputs.token || github.token }}
           GUARDRAILS_RESULT_DIR: guardrails-results
 
       - name: Upload results
@@ -323,9 +339,17 @@ jobs:
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
+      - name: Create admin token from GitHub App
+        if: ${{ !secrets['admin-token'] && secrets['app-id'] && secrets['app-private-key'] }}
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349  # v2
+        with:
+          app-id: ${{ secrets['app-id'] }}
+          private-key: ${{ secrets['app-private-key'] }}
+
       - run: bash guardrails/scripts/checks/domain/check_pbac_branch_policy.sh ${{ inputs.strict && '--strict' || '' }}
         env:
-          GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
+          GH_TOKEN: ${{ secrets['admin-token'] || steps.app-token.outputs.token || github.token }}
           GUARDRAILS_RESULT_DIR: guardrails-results
 
       - name: Upload results
