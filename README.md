@@ -12,7 +12,7 @@ Skripte, Workflow-Job-IDs und Display-Namen folgen einheitlich der OWASP-Designa
 | Designation | Job-ID | Skript | Was wird erkannt |
 |---|---|---|---|
 | `CICD-SEC-01-FLOW` | `cicd-sec-01-flow` | `scripts/checks/domain/cicd_sec_01_flow.sh` | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
-| `CICD-SEC-03` | `cicd-sec-03` | `scripts/checks/domain/cicd_sec_03.sh` | Fehlende Lock-Files (npm, pip, Poetry, Go, Rust, Ruby, PHP) |
+| `CICD-SEC-03` | `cicd-sec-03` | `scripts/checks/domain/cicd_sec_03.sh` | Modulare Package-Pruefung fuer JS/TS, Python, Go, Rust, Ruby und PHP |
 | `CICD-SEC-04` | `cicd-sec-04` | `scripts/checks/domain/cicd_sec_04.sh` | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
 | `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
 | `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
@@ -217,6 +217,13 @@ cicd-guardrails/
 │   │   ├── domain/                       # Fachliche Startpunkte (cicd_sec_*)
 │   │   │   ├── cicd_sec_01_flow.sh
 │   │   │   ├── cicd_sec_03.sh
+│   │   │   ├── package/                  # Sprachmodule fuer CICD-SEC-03
+│   │   │   │   ├── js_ts.sh
+│   │   │   │   ├── python.sh
+│   │   │   │   ├── go.sh
+│   │   │   │   ├── rust.sh
+│   │   │   │   ├── ruby.sh
+│   │   │   │   └── php.sh
 │   │   │   ├── cicd_sec_04.sh
 │   │   │   ├── cicd_sec_05_branch.sh
 │   │   │   ├── cicd_sec_05_permissions.sh
@@ -230,7 +237,8 @@ cicd-guardrails/
 │   ├── aggregate_risk_summary.sh
 │   └── lib/
 │       ├── config.sh                     # .guardrails.yml Reader (Context + Checks)
-│       └── feedback.sh                   # Reporting-Helper, Mode-Override
+│       ├── feedback.sh                   # Reporting-Helper, Mode-Override
+│       └── package_scan.sh               # Shared helper functions for package checks
 │
 └── tests/
     ├── fixtures/
@@ -284,6 +292,26 @@ repos:
 
 Local-first hooks are intentionally focused on repository-file analysis.
 API-context checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) remain workflow-focused and are not enabled as default pre-commit hooks.
+
+### Modular package check architecture
+
+`CICD-SEC-03` keeps its public designation and workflow wiring, but internally uses a dispatcher pattern.
+The top-level check script orchestrates language modules with a stable interface:
+
+- input: repository root path
+- output: findings via shared reporting library
+- exit semantics: `0` (pass/warn), `1` (fail), `2` (missing runtime dependency)
+
+Current language modules:
+
+- `scripts/checks/domain/package/js_ts.sh`
+- `scripts/checks/domain/package/python.sh`
+- `scripts/checks/domain/package/go.sh`
+- `scripts/checks/domain/package/rust.sh`
+- `scripts/checks/domain/package/ruby.sh`
+- `scripts/checks/domain/package/php.sh`
+
+This design supports repositories with one service at root and monorepos with many nested services.
 
 ---
 

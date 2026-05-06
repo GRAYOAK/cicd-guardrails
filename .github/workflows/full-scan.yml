@@ -222,7 +222,7 @@ jobs:
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_03.sh target
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_03.sh target ${{ inputs.strict && '--strict' || '' }}
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 

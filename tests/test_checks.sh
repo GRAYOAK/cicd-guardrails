@@ -119,6 +119,128 @@ assert_exit "fails when npm lockfile is missing" 1 "$LAST_EXIT"
 teardown
 
 echo ""
+echo "▶ cicd_sec_03.sh monorepo with mixed services"
+setup
+mkdir -p "$TMP/services/api" "$TMP/services/worker"
+cat > "$TMP/services/api/package.json" <<'EOF'
+{"name":"api","private":true}
+EOF
+cat > "$TMP/services/worker/package.json" <<'EOF'
+{"name":"worker","private":true}
+EOF
+echo '{}' > "$TMP/services/worker/package-lock.json"
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "fails when one nested package.json misses lockfile" 1 "$LAST_EXIT"
+assert_output_contains "reports nested path for missing lockfile" "services/api/package.json"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh passes for locked js monorepo"
+setup
+mkdir -p "$TMP/apps/web" "$TMP/apps/docs"
+cat > "$TMP/apps/web/package.json" <<'EOF'
+{"name":"web","private":true}
+EOF
+echo '{}' > "$TMP/apps/web/yarn.lock"
+cat > "$TMP/apps/docs/package.json" <<'EOF'
+{"name":"docs","private":true}
+EOF
+echo '{}' > "$TMP/apps/docs/pnpm-lock.yaml"
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "passes when nested npm manifests have lockfiles" 0 "$LAST_EXIT"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh fails for python pyproject without lockfile"
+setup
+mkdir -p "$TMP/services/py"
+cat > "$TMP/services/py/pyproject.toml" <<'EOF'
+[project]
+name = "py-service"
+version = "0.1.0"
+EOF
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "fails when pyproject has no poetry or uv lockfile" 1 "$LAST_EXIT"
+assert_output_contains "reports missing pyproject lockfile" "Missing poetry or uv lockfile next to pyproject.toml."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh fails for unpinned python requirements"
+setup
+mkdir -p "$TMP/services/py"
+cat > "$TMP/services/py/requirements.txt" <<'EOF'
+requests
+flask==3.0.3
+EOF
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "fails for non pinned requirements entry" 1 "$LAST_EXIT"
+assert_output_contains "reports unpinned dependency name" "Unpinned python dependency 'requests'."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh passes for pinned python dependencies"
+setup
+mkdir -p "$TMP/services/py"
+cat > "$TMP/services/py/pyproject.toml" <<'EOF'
+[project]
+name = "py-service"
+version = "0.1.0"
+EOF
+echo '# lock' > "$TMP/services/py/poetry.lock"
+cat > "$TMP/services/py/requirements-dev.txt" <<'EOF'
+pytest==8.3.2
+ruff==0.5.7
+EOF
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "passes for pyproject lockfile and pinned requirements" 0 "$LAST_EXIT"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh fails for missing go lockfile"
+setup
+mkdir -p "$TMP/services/go-api"
+cat > "$TMP/services/go-api/go.mod" <<'EOF'
+module example.com/go-api
+
+go 1.22
+EOF
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "fails when go.mod has no go.sum" 1 "$LAST_EXIT"
+assert_output_contains "reports missing go lockfile" "Missing go.sum next to go.mod."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh fails for missing rust lockfile"
+setup
+mkdir -p "$TMP/services/rust-worker"
+cat > "$TMP/services/rust-worker/Cargo.toml" <<'EOF'
+[package]
+name = "rust-worker"
+version = "0.1.0"
+edition = "2021"
+EOF
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "fails when Cargo.toml has no Cargo.lock" 1 "$LAST_EXIT"
+assert_output_contains "reports missing rust lockfile" "Missing Cargo.lock next to Cargo.toml."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh fails for missing ruby and php lockfiles"
+setup
+mkdir -p "$TMP/services/ruby-app" "$TMP/services/php-app"
+cat > "$TMP/services/ruby-app/Gemfile" <<'EOF'
+source "https://rubygems.org"
+EOF
+cat > "$TMP/services/php-app/composer.json" <<'EOF'
+{"name":"acme/php-app"}
+EOF
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "fails when Gemfile or composer.json has no lockfile" 1 "$LAST_EXIT"
+assert_output_contains "reports missing ruby lockfile" "Missing Gemfile.lock next to Gemfile."
+assert_output_contains "reports missing php lockfile" "Missing composer.lock next to composer.json."
+teardown
+
+echo ""
 echo "▶ cicd_sec_05_runner_access.sh"
 setup
 cat > "$TMP/.github/workflows/ci.yml" <<'EOF'

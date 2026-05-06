@@ -44,7 +44,7 @@
   entry: scripts/checks/domain/cicd_sec_03.sh .
   language: script
   pass_filenames: false
-  files: ^(package\.json|pyproject\.toml|requirements[^/]*\.txt|go\.mod|Cargo\.toml|Gemfile|composer\.json)$
+  files: (^|.*/)(package\.json|pyproject\.toml|requirements[^/]*\.txt|go\.mod|Cargo\.toml|Gemfile|composer\.json)$
 
 - id: cicd-sec-06
   name: CICD-SEC-06 (Secret scanning)
