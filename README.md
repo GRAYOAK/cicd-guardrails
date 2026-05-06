@@ -110,6 +110,11 @@ jobs:
 Der finale Job `📊 Risk summary` liest optional eine Datei `.guardrails.yml` im Ziel-Repo
 und gewichtet Findings kontextabhängig (z. B. public vs private, self-hosted vs GitHub-hosted).
 
+Referenzen im Root dieses Repos:
+
+- `.guardrails.schema.json` (validation schema for tooling and IDEs)
+- `.guardrails.example.yml` (copy-paste starter file)
+
 Beispiel:
 
 ```yaml

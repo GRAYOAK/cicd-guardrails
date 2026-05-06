@@ -12,6 +12,8 @@ Use this skill for changes in:
 - `scripts/check_*.sh`
 - `scripts/lib/feedback.sh`
 - `scripts/aggregate_risk_summary.sh`
+- `.guardrails.schema.json`
+- `.guardrails.example.yml`
 - `.github/workflows/full-scan.yml`
 - `.github/workflows/self-test.yml`
 - `tests/test_checks.sh`
@@ -46,8 +48,12 @@ Use this skill for changes in:
 When adjusting risk prioritization:
 - Read context from target repo `.guardrails.yml`.
 - Treat `.guardrails.yml` as source of truth.
+- Treat `.guardrails.schema.json` as the authoritative list of allowed context values.
+- Keep `.guardrails.example.yml` aligned with the schema and README examples.
 - Keep missing-config behavior explicit and safe (conservative defaults).
 - Keep scoring transparent in final summary (context fields + score rationale).
+- Keep schema linkage explicit in consumer config using:
+  - `# yaml-language-server: $schema=https://raw.githubusercontent.com/Christopher-Rust/cicd-guardrails/main/.guardrails.schema.json`
 
 Expected `.guardrails.yml` fields:
 
@@ -59,6 +65,12 @@ context:
   data_sensitivity: high          # low | medium | high
   deployment_criticality: prod    # dev | prod | regulated
 ```
+
+Allowed values are maintained in:
+- `.guardrails.schema.json` (reference for valid values and IDE validation)
+- `.guardrails.example.yml` (starter config for consumers)
+
+Do not reintroduce `.guardrails.schema.yml`; JSON schema is the canonical format.
 
 ## Output contract for checks
 
@@ -91,9 +103,20 @@ Each check should produce:
 2. Keep reasons and fix-order text deterministic and explicit.
 3. Validate with at least one failing fixture and one passing fixture.
 
+### Keep consumer demo wiring up to date
+
+When changes affect reusable workflow usage in `cicd-demo-errors`:
+1. Keep `Taskfile.dist.yml` paths relative.
+2. Prefer remote SHA resolution over local directory SHA:
+   - `git ls-remote <guardrails-remote> HEAD | awk '{print $1}'`
+3. Update `.github/workflows/security.yml` to pin `full-scan.yml@<SHA>`.
+4. Ensure consumer `.guardrails.yml` remains valid against schema values.
+5. Ensure consumer `.guardrails.yml` keeps the `yaml-language-server` schema header.
+
 ## Definition of done
 
 - Tests pass: `bash ./tests/test_checks.sh`
 - No new diagnostics in edited files.
 - Workflow wiring still consistent for artifacts and final summary job.
 - README reflects behavior for users of reusable workflow.
+- Schema/example docs and consumer config examples are consistent.

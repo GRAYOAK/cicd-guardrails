@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Christopher-Rust/cicd-guardrails/main/.guardrails.schema.json",
+  "title": "Guardrails Context Schema",
+  "description": "Schema for .guardrails.yml context values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "context"
+  ],
+  "properties": {
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visibility",
+        "software_type",
+        "runner_type",
+        "data_sensitivity",
+        "deployment_criticality"
+      ],
+      "properties": {
+        "visibility": {
+          "type": "string",
+          "enum": ["public", "private", "internal"],
+          "description": "Repository visibility."
+        },
+        "software_type": {
+          "type": "string",
+          "enum": ["open_source", "private_software"],
+          "description": "Distribution model of the software in the repository."
+        },
+        "runner_type": {
+          "type": "string",
+          "enum": ["self_hosted", "github_hosted"],
+          "description": "Primary GitHub Actions runner model."
+        },
+        "data_sensitivity": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Sensitivity of data handled in CI/CD and deployment flows."
+        },
+        "deployment_criticality": {
+          "type": "string",
+          "enum": ["dev", "prod", "regulated"],
+          "description": "Operational criticality and governance level of deployments."
+        }
+      }
+    }
+  }
+}

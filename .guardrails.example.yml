@@ -1,0 +1,6 @@
+context:
+  visibility: public
+  software_type: open_source
+  runner_type: self_hosted
+  data_sensitivity: medium
+  deployment_criticality: dev
