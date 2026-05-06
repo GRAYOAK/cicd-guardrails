@@ -1,0 +1,55 @@
+- id: cicd-sec-04
+  name: CICD-SEC-04 (pull_request_target)
+  description: Detects pull_request_target usage in workflow files.
+  entry: scripts/checks/domain/cicd_sec_04.sh .
+  language: script
+  pass_filenames: false
+  files: ^\.github/workflows/.*\.(yml|yaml)$
+
+- id: cicd-sec-08
+  name: CICD-SEC-08 (Action SHA-Pinning)
+  description: Detects mutable third-party action references.
+  entry: scripts/checks/domain/cicd_sec_08.sh .
+  language: script
+  pass_filenames: false
+  files: ^(\.github/workflows/.*\.(yml|yaml)|actions/.*/action\.(yml|yaml))$
+
+- id: cicd-sec-05-permissions
+  name: CICD-SEC-05-PERMISSIONS (Workflow permissions)
+  description: Ensures workflow and job permissions blocks exist.
+  entry: scripts/checks/domain/cicd_sec_05_permissions.sh .
+  language: script
+  pass_filenames: false
+  files: ^\.github/workflows/.*\.(yml|yaml)$
+
+- id: cicd-sec-05-runner-access
+  name: CICD-SEC-05-RUNNER-ACCESS (Runner access policy)
+  description: Detects generic self-hosted runner labels.
+  entry: scripts/checks/domain/cicd_sec_05_runner_access.sh .
+  language: script
+  pass_filenames: false
+  files: ^\.github/workflows/.*\.(yml|yaml)$
+
+- id: cicd-sec-07-runner-hardening
+  name: CICD-SEC-07-RUNNER-HARDENING (Runner hardening)
+  description: Detects privileged options and unsafe runner patterns.
+  entry: scripts/checks/domain/cicd_sec_07_runner_hardening.sh .
+  language: script
+  pass_filenames: false
+  files: ^\.github/workflows/.*\.(yml|yaml)$
+
+- id: cicd-sec-03
+  name: CICD-SEC-03 (Dependency lock files)
+  description: Ensures lock files and pinned dependencies are present.
+  entry: scripts/checks/domain/cicd_sec_03.sh .
+  language: script
+  pass_filenames: false
+  files: ^(package\.json|pyproject\.toml|requirements[^/]*\.txt|go\.mod|Cargo\.toml|Gemfile|composer\.json)$
+
+- id: cicd-sec-06
+  name: CICD-SEC-06 (Secret scanning)
+  description: Runs secret scanning manually when gitleaks is available.
+  entry: scripts/checks/domain/cicd_sec_06.sh .
+  language: script
+  pass_filenames: false
+  stages: [manual]

@@ -259,6 +259,32 @@ GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo bash scripts/checks/domain/ci
 bash tests/test_checks.sh
 ```
 
+### Pre-commit integration for consumer repositories
+
+`cicd-guardrails` now publishes reusable pre-commit hook definitions via `.pre-commit-hooks.yaml`.
+Consumer repositories can pin this repository to the same commit SHA used by the reusable workflow.
+
+Example:
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/Christopher-Rust/cicd-guardrails
+    rev: <same-40-char-sha-as-full-scan-workflow>
+    hooks:
+      - id: cicd-sec-04
+      - id: cicd-sec-08
+      - id: cicd-sec-05-permissions
+      - id: cicd-sec-05-runner-access
+      - id: cicd-sec-07-runner-hardening
+      - id: cicd-sec-03
+      - id: cicd-sec-06
+        stages: [manual]
+```
+
+Local-first hooks are intentionally focused on repository-file analysis.
+API-context checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) remain workflow-focused and are not enabled as default pre-commit hooks.
+
 ---
 
 ## Dependabot aktivieren
