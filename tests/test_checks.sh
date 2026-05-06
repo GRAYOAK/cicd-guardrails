@@ -242,6 +242,62 @@ run_check check_permissions.sh "$TMP" || true
 assert_exit "schlägt bei fehlendem job-level permissions" 1 "$LAST_EXIT"
 teardown
 
+# ── aggregate_risk_summary.sh ────────────────────────────────────────────────
+echo ""
+echo "▶ aggregate_risk_summary.sh"
+
+setup
+mkdir -p "$TMP/target" "$TMP/results"
+cat > "$TMP/results/CICD-SEC-04.json" << 'EOF'
+{
+  "check_id": "CICD-SEC-04",
+  "title": "pull_request_target check",
+  "status": "FAIL",
+  "counts": { "errors": 1, "warnings": 0, "notices": 0 },
+  "owasp_reference": "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution/"
+}
+EOF
+cat > "$TMP/results/CICD-SEC-08.json" << 'EOF'
+{
+  "check_id": "CICD-SEC-08",
+  "title": "Action pinning check",
+  "status": "FAIL",
+  "counts": { "errors": 1, "warnings": 0, "notices": 0 },
+  "owasp_reference": "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Third-Party-Services/"
+}
+EOF
+cat > "$TMP/results/CICD-SEC-03.json" << 'EOF'
+{
+  "check_id": "CICD-SEC-03",
+  "title": "Dependency lockfile check",
+  "status": "FAIL",
+  "counts": { "errors": 1, "warnings": 0, "notices": 0 },
+  "owasp_reference": "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse/"
+}
+EOF
+cat > "$TMP/results/CICD-SEC-99.json" << 'EOF'
+{
+  "check_id": "CICD-SEC-99",
+  "title": "Unknown check",
+  "status": "FAIL",
+  "counts": { "errors": 1, "warnings": 0, "notices": 0 },
+  "owasp_reference": "https://owasp.org/www-project-top-10-ci-cd-security-risks/"
+}
+EOF
+set +e
+bash "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results" >"$TMP/summary.out" 2>&1
+LAST_EXIT=$?
+set -e
+LAST_OUTPUT="$(cat "$TMP/summary.out")"
+assert_exit "liefert exit 0 für reine Ausgabe" 0 "$LAST_EXIT"
+assert_output_contains "liefert Executive Snapshot" "Executive snapshot:"
+assert_output_contains "liefert Critical Block" "#### Critical"
+assert_output_contains "liefert High Block" "#### High"
+assert_output_contains "liefert Medium Block" "#### Medium"
+assert_output_contains "liefert Exploit path Feld" "- Exploit path:"
+assert_output_contains "liefert kurze OWASP Referenzen" "[OWASP CICD-SEC-04]"
+teardown
+
 # ── Ergebnis ─────────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════"

@@ -136,6 +136,33 @@ Wie die Werte einfließen:
 
 Fehlt die Datei, nutzt Guardrails konservative Defaults und schreibt das transparent ins Summary.
 
+### 6. Final Summary lesen
+
+Die finale Ausgabe im Job `📊 Risk summary` ist auf schnelle Priorisierung optimiert:
+
+- Executive Snapshot mit Anzahl `Critical | High | Medium`
+- Gruppierung nach Severity
+- Pro Finding immer:
+  - Problem
+  - Exploit path
+  - Impact
+  - Fix first
+  - kurze Referenzlinks (z. B. `[OWASP CICD-SEC-04](...)`)
+
+Beispiel (gekürzt):
+
+```text
+- Executive snapshot: Critical `1` | High `1` | Medium `1`
+
+#### Critical
+1. **CICD-SEC-04** — pull_request_target check
+   - Problem: Privileged pull request execution can run untrusted contributor-controlled code.
+   - Exploit path: A malicious fork PR can abuse privileged workflow context to execute trusted jobs with untrusted code.
+   - Impact: Pipeline takeover with potential artifact tampering and secret exposure.
+   - Fix first: Avoid pull_request_target for untrusted PRs. Separate privileged jobs and prevent checking out fork head refs.
+   - Reference: [OWASP CICD-SEC-04](https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution/)
+```
+
 ---
 
 ## Repo-Struktur

@@ -65,6 +65,17 @@ When adjusting risk prioritization:
 - Keep `.guardrails.example.yml` aligned with the schema and README examples.
 - Keep missing-config behavior explicit and safe (conservative defaults).
 - Keep scoring transparent in final summary (context fields + score rationale).
+- Prefer severity-grouped presentation over flat score-only ordering for faster triage.
+- Keep each finding block structurally consistent with concise fields:
+  - `Problem`
+  - `Exploit path`
+  - `Impact`
+  - `Fix first`
+- Describe exploitability in operational terms to improve fix prioritization.
+- Use short labeled markdown links for references instead of raw URLs.
+- Keep context/scoring visibility compact so findings remain the visual focus.
+- Add or update summary-format assertions in tests whenever report structure changes.
+- Keep README summary examples aligned with the current runtime output format.
 - Keep schema linkage explicit in consumer config using:
   - `# yaml-language-server: $schema=https://raw.githubusercontent.com/Christopher-Rust/cicd-guardrails/main/.guardrails.schema.json`
 
