@@ -104,6 +104,22 @@ Load-on-demand triggers:
 - For implementation path decisions, read `playbooks.md`.
 - For final chat output and skill updates based on learnings, read `learnings.md`.
 
+## Test repositories
+
+Use two complementary demo repositories to validate changes end-to-end:
+
+- `cicd-demo-errors` (`/Users/rust/Projects/try/CICD Security/cicd-demo-errors`)
+  - Purpose: negative fixture with intentional violations.
+  - Expected outcome: relevant checks report findings and fail in strict mode.
+  - Use it to validate detection quality, annotation clarity, and remediation text.
+
+- `cicd-demo-well` (`/Users/rust/Projects/try/CICD Security/cicd-demo-well`)
+  - Purpose: positive fixture with compliant workflows and multi-language lockfile coverage.
+  - Expected outcome: file-based checks pass; API-context checks require repository policy context and valid token permissions.
+  - Use it to catch false positives and verify stable pass behavior across JS/TS, Python, Go, Rust, Ruby, and PHP package patterns.
+
+When behavior changes are user-facing, update both repositories and keep their workflow pins aligned with the reusable workflow revision.
+
 ## Definition of done
 
 - Tests pass: `bash ./tests/test_checks.sh`
