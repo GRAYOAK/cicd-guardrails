@@ -110,7 +110,7 @@ jobs:
 
   # ── CICD-SEC-04: pull_request_target ──────────────────────────────────────
   cicd-sec-04:
-    name: '🚨 CICD-SEC-04 (pull_request_target)'
+    name: '🧩 Code | 🚨 04 — pull_request_target'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-04') }}
     runs-on: ubuntu-latest
@@ -143,7 +143,7 @@ jobs:
 
   # ── CICD-SEC-08: Action SHA-Pinning ───────────────────────────────────────
   cicd-sec-08:
-    name: '📌 CICD-SEC-08 (Action SHA-Pinning)'
+    name: '🧩 Code | 📌 08 — Action SHA pinning'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-08') }}
     runs-on: ubuntu-latest
@@ -174,7 +174,7 @@ jobs:
 
   # ── CICD-SEC-05-PERMISSIONS: Workflow permissions ─────────────────────────
   cicd-sec-05-permissions:
-    name: '🔐 CICD-SEC-05-PERMISSIONS (Workflow permissions)'
+    name: '🧩 Code | 🔐 05-permissions — Workflow permissions'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-05-permissions') }}
     runs-on: ubuntu-latest
@@ -205,7 +205,7 @@ jobs:
 
   # ── CICD-SEC-03: Dependency Lock Files ────────────────────────────────────
   cicd-sec-03:
-    name: '🔒 CICD-SEC-03 (Dependency Lock Files)'
+    name: '🧩 Code | 🔒 03 — Dependency lockfiles'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-03') }}
     runs-on: ubuntu-latest
@@ -236,7 +236,7 @@ jobs:
 
   # ── CICD-SEC-06: Secret scanning ──────────────────────────────────────────
   cicd-sec-06:
-    name: '🕵️ CICD-SEC-06 (Secret Scanning)'
+    name: '🧩 Code | 🕵️ 06 — Secret scanning'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-06') }}
     runs-on: ubuntu-latest
@@ -278,7 +278,7 @@ jobs:
 
   # ── CICD-SEC-01-FLOW: Flow control ────────────────────────────────────────
   cicd-sec-01-flow:
-    name: '🧭 CICD-SEC-01-FLOW (Flow control)'
+    name: '⚙️ Settings | 🧭 01-flow — Flow control'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-01-flow') }}
     runs-on: ubuntu-latest
@@ -310,7 +310,7 @@ jobs:
 
   # ── CICD-SEC-05-BRANCH: Branch governance and PBAC ────────────────────────
   cicd-sec-05-branch:
-    name: '🛂 CICD-SEC-05-BRANCH (Branch governance and PBAC)'
+    name: '⚙️ Settings | 🛂 05-branch — Branch governance'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-05-branch') }}
     runs-on: ubuntu-latest
@@ -342,7 +342,7 @@ jobs:
 
   # ── CICD-SEC-05-RUNNER-ACCESS: Runner access policy ───────────────────────
   cicd-sec-05-runner-access:
-    name: '🖥️ CICD-SEC-05-RUNNER-ACCESS (Runner access policy)'
+    name: '🧩 Code | 🖥️ 05-runner-access — Runner access'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-05-runner-access') }}
     runs-on: ubuntu-latest
@@ -373,7 +373,7 @@ jobs:
 
   # ── CICD-SEC-07-RUNNER-HARDENING: Runner hardening ────────────────────────
   cicd-sec-07-runner-hardening:
-    name: '🧱 CICD-SEC-07-RUNNER-HARDENING (Runner hardening)'
+    name: '🧩 Code | 🧱 07-runner-hardening — Runner hardening'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-07-runner-hardening') }}
     runs-on: ubuntu-latest

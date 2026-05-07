@@ -40,3 +40,6 @@ Antwortformat: 1=ja, 2=nein, 3=ja
 - Validate remote-derived workflow SHAs with a strict 40-character hexadecimal check before automation rewrites pinned workflow references.
 - Keep positive and negative fixture repositories pinned to the same reusable-workflow revision to detect regressions and false positives consistently.
 - Separate local verification into file-based checks and API-context checks, and document required token and policy prerequisites explicitly.
+- Classify every check that depends primarily on **GitHub API repository policy** (for example branch protection) as **Settings** in workflow job display names, the README scope column, and `check_scope()` in `aggregate_risk_summary.sh`; keep file- and checkout-based checks as **Code**, and keep these three places aligned when adding checks.
+- When **job display names** (`name:`) change, update the README required-status-check list and consumer branch protection rules; `skip-checks` and `.guardrails.yml` stay keyed by workflow job ID and `FB_CHECK_ID` only.
+- When introducing new Settings-class checks or changing scope rules, extend `check_scope()` and add or adjust tests, or add an optional `scope` field to per-check result JSON and teach the aggregator to prefer it over the allowlist.

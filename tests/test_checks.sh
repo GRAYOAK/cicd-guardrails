@@ -45,6 +45,33 @@ assert_output_contains() {
   fi
 }
 
+assert_aggregate_critical_scope_order() {
+  local description="$1"
+  if printf '%s' "$LAST_OUTPUT" | python3 -c '
+import sys
+s = sys.stdin.read()
+assert "#### Critical" in s, "missing Critical section"
+start = s.index("#### Critical")
+end = s.find("#### High", start)
+block = s[start:end] if end != -1 else s[start:]
+assert "##### Code" in block and "##### Settings" in block
+c = block.index("##### Code")
+st = block.index("##### Settings")
+line7 = "- **CICD-SEC-07-RUNNER-HARDENING**"
+line1 = "- **CICD-SEC-01-FLOW**"
+assert line7 in block and line1 in block
+off7 = block.index(line7)
+off1 = block.index(line1)
+assert c < off7 < st < off1, (c, off7, st, off1)
+'; then
+    echo "  ✅ $description"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ $description (Critical section Code/Settings order or check_id placement)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 run_check() {
   local script="$1"
   shift
@@ -415,6 +442,9 @@ EOF
 run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results"
 assert_exit "returns exit 0 for summary output" 0 "$LAST_EXIT"
 assert_output_contains "prints executive snapshot" "Executive snapshot:"
+assert_output_contains "groups Critical by Code and Settings" "##### Code"
+assert_output_contains "groups Critical by Code and Settings (settings bucket)" "##### Settings"
+assert_aggregate_critical_scope_order "Critical: Code bucket lists runner hardening before Settings lists flow check"
 assert_output_contains "includes OWASP short reference labels" "[OWASP CICD-SEC-01-FLOW]"
 assert_output_contains "lists container_registry context" "container_registry:"
 teardown

@@ -193,6 +193,56 @@ owasp_label() {
   echo "OWASP $1"
 }
 
+# Classify checks for summary grouping: API-driven repo policy vs file-based scan.
+check_scope() {
+  case "$1" in
+    CICD-SEC-01-FLOW | CICD-SEC-05-BRANCH)
+      echo "settings"
+      ;;
+    *)
+      echo "code"
+      ;;
+  esac
+}
+
+append_severity_bucket() {
+  local bucket="$1"
+  local entry="$2"
+  case "$bucket" in
+    critical_code) critical_code+="${entry}" ;;
+    critical_settings) critical_settings+="${entry}" ;;
+    high_code) high_code+="${entry}" ;;
+    high_settings) high_settings+="${entry}" ;;
+    medium_code) medium_code+="${entry}" ;;
+    medium_settings) medium_settings+="${entry}" ;;
+    *)
+      echo "aggregate_risk_summary: unknown severity bucket '${bucket}'" >&2
+      exit 1
+      ;;
+  esac
+}
+
+render_severity_block() {
+  local title="$1"
+  local code_block="$2"
+  local settings_block="$3"
+  local out=""
+
+  if [[ -z "$code_block" && -z "$settings_block" ]]; then
+    printf '%s' "$out"
+    return 0
+  fi
+
+  out+="#### ${title}\n"
+  if [[ -n "$code_block" ]]; then
+    out+="##### Code\n${code_block}\n"
+  fi
+  if [[ -n "$settings_block" ]]; then
+    out+="##### Settings\n${settings_block}\n"
+  fi
+  printf '%s' "$out"
+}
+
 print_summary() {
   local out
   out="## Risk summary and fix order\n\n"
@@ -211,6 +261,8 @@ print_summary() {
   fi
 
   out+="\n### Prioritized fix order\n"
+  out+="- **Code**: repository files and workflow YAML from the checkout.\n"
+  out+="- **Settings**: branch protection and flow policy via GitHub API (admin-capable token may be required).\n\n"
   out+="$1\n"
 
   printf "%b" "$out"
@@ -253,15 +305,15 @@ done
 
 IFS=$'\n' sorted=($(printf "%s\n" "${rows[@]}" | sort -nr -k1,1))
 
-critical=""
-high=""
-medium=""
+critical_code=""
+critical_settings=""
+high_code=""
+high_settings=""
+medium_code=""
+medium_settings=""
 critical_count=0
 high_count=0
 medium_count=0
-rank_critical=0
-rank_high=0
-rank_medium=0
 for r in "${sorted[@]}"; do
   score="${r%%$'\t'*}"
   rest="${r#*$'\t'}"
@@ -279,43 +331,51 @@ for r in "${sorted[@]}"; do
   fi
 
   severity="$(severity_for_score "$score")"
+  scope="$(check_scope "$check_id")"
   hint="$(derive_fix_hint "$check_id")"
   problem="$(derive_problem "$check_id")"
   exploit="$(derive_exploit_path "$check_id")"
   impact="$(derive_impact "$check_id")"
   reference_label="$(owasp_label "$check_id")"
-  entry="1. **${check_id}** — ${title}\n"
-  entry+="   - Status: \`${status}\`\n"
+  entry="- **${check_id}** — ${title}\n"
+  entry+="  - Status: \`${status}\`\n"
   if [[ -n "$mode" && "$mode" != "fail" ]]; then
-    entry+="   - Mode: \`${mode}\` (configured override in .guardrails.yml)\n"
+    entry+="  - Mode: \`${mode}\` (configured override in .guardrails.yml)\n"
   fi
-  entry+="   - Risk score: \`${score}\`\n"
-  entry+="   - Problem: ${problem}\n"
-  entry+="   - Exploit path: ${exploit}\n"
-  entry+="   - Impact: ${impact}\n"
-  entry+="   - Fix first: ${hint}\n"
+  entry+="  - Risk score: \`${score}\`\n"
+  entry+="  - Problem: ${problem}\n"
+  entry+="  - Exploit path: ${exploit}\n"
+  entry+="  - Impact: ${impact}\n"
+  entry+="  - Fix first: ${hint}\n"
   if [[ -n "$owasp" ]]; then
-    entry+="   - Reference: [${reference_label}](${owasp})\n"
+    entry+="  - Reference: [${reference_label}](${owasp})\n"
   fi
+  entry+="\n"
 
   case "$severity" in
     Critical)
-      rank_critical=$((rank_critical + 1))
       critical_count=$((critical_count + 1))
-      entry="${rank_critical}${entry:1}"
-      critical+="${entry}\n"
+      if [[ "$scope" == "settings" ]]; then
+        append_severity_bucket "critical_settings" "$entry"
+      else
+        append_severity_bucket "critical_code" "$entry"
+      fi
       ;;
     High)
-      rank_high=$((rank_high + 1))
       high_count=$((high_count + 1))
-      entry="${rank_high}${entry:1}"
-      high+="${entry}\n"
+      if [[ "$scope" == "settings" ]]; then
+        append_severity_bucket "high_settings" "$entry"
+      else
+        append_severity_bucket "high_code" "$entry"
+      fi
       ;;
     *)
-      rank_medium=$((rank_medium + 1))
       medium_count=$((medium_count + 1))
-      entry="${rank_medium}${entry:1}"
-      medium+="${entry}\n"
+      if [[ "$scope" == "settings" ]]; then
+        append_severity_bucket "medium_settings" "$entry"
+      else
+        append_severity_bucket "medium_code" "$entry"
+      fi
       ;;
   esac
 done
@@ -328,15 +388,9 @@ fi
 
 list+="\n"
 
-if [[ -n "$critical" ]]; then
-  list+="#### Critical\n${critical}\n"
-fi
-if [[ -n "$high" ]]; then
-  list+="#### High\n${high}\n"
-fi
-if [[ -n "$medium" ]]; then
-  list+="#### Medium\n${medium}\n"
-fi
+list+="$(render_severity_block "Critical" "$critical_code" "$critical_settings")"
+list+="$(render_severity_block "High" "$high_code" "$high_settings")"
+list+="$(render_severity_block "Medium" "$medium_code" "$medium_settings")"
 
 if [[ "$critical_count" -eq 0 && "$high_count" -eq 0 && "$medium_count" -eq 0 ]]; then
   list+="- No actionable findings based on current results.\n"

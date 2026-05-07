@@ -40,12 +40,18 @@ The OWASP designation is the identity for every check. Keep all four layers in s
 
 - **Skript filename**: `scripts/checks/domain/cicd_sec_<NR>[_<aspect>].sh` in snake_case lowercase (e.g. `cicd_sec_05_runner_access.sh`).
 - **Workflow job ID**: kebab-case mirror of the filename (e.g. `cicd-sec-05-runner-access`). Used by `skip-checks` input.
-- **Display name**: leads with the designation, e.g. `'🖥️ CICD-SEC-05-RUNNER-ACCESS (Runner access policy)'`. Used as required-status-check name on the consumer side.
+- **Display name**: GitHub job `name:` in the Actions UI. Use a **scope emoji** (`🧩` = Code / checkout content, `⚙️` = Settings / GitHub API policy), then the text `Code |` or `Settings |`, then a **theme emoji** for the check topic, compact slug, and short title — e.g. `'🧩 Code | 🖥️ 05-runner-access — Runner access'` or `'⚙️ Settings | 🧭 01-flow — Flow control'`. The OWASP designation stays in `FB_CHECK_ID` and JSON, not necessarily in the display string verbatim.
 - **FB_CHECK_ID**: the designation in upper case, identical to the keys allowed in `.guardrails.yml` `checks:` block (e.g. `CICD-SEC-05-RUNNER-ACCESS`).
 
 When several checks belong to the same OWASP family, use a clear suffix (e.g. `CICD-SEC-05-PERMISSIONS`, `CICD-SEC-05-BRANCH`, `CICD-SEC-05-RUNNER-ACCESS`); avoid the bare family ID for a single sub-aspect.
 
-Renaming any of these layers is a breaking change for consumers (status checks, `skip-checks` inputs). Document the mapping in `README.md` and propagate to the demo repo's `.guardrails.yml` if relevant.
+Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `skip-checks` and `.guardrails.yml` keys. Changing **job display names** (`name:`) is a breaking change for branch-protection required checks that match that string. Document any rename in `README.md` and propagate to consumer repos when relevant.
+
+### Code vs Settings (display names and risk summary)
+
+- **Settings**: checks driven mainly by **live GitHub repository policy via API** (today: branch protection / flow). Use `⚙️ Settings | …` in job `name:`, mark **Settings** in the README scope column, and include the designation in `check_scope()` in `scripts/aggregate_risk_summary.sh` so grouped markdown stays correct.
+- **Code**: checks over **checked-out repository content**. Use `🧩 Code | …` and keep them out of the Settings allowlist unless the implementation changes.
+- When adding or reclassifying checks, update workflow names, README, and aggregator together; longer term, an optional `scope` field in per-check result JSON can become the source of truth so the aggregator does not rely only on a growing `check_scope` allowlist.
 
 ## Why this matters
 

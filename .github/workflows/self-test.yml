@@ -22,7 +22,7 @@ jobs:
 
   # ── Dogfood these checks on this repo ─────────────────────────────────────
   self-cicd-sec-04:
-    name: 'Self-Check: CICD-SEC-04 (pull_request_target)'
+    name: 'Self-Check: 🧩 Code | 🚨 04 — pull_request_target'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,7 +31,7 @@ jobs:
       - run: bash scripts/checks/domain/cicd_sec_04.sh .
 
   self-cicd-sec-08:
-    name: 'Self-Check: CICD-SEC-08 (Action SHA-Pinning)'
+    name: 'Self-Check: 🧩 Code | 📌 08 — Action SHA pinning'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,7 +40,7 @@ jobs:
       - run: bash scripts/checks/domain/cicd_sec_08.sh .
 
   self-cicd-sec-05-permissions:
-    name: 'Self-Check: CICD-SEC-05-PERMISSIONS (Workflow permissions)'
+    name: 'Self-Check: 🧩 Code | 🔐 05-permissions — Workflow permissions'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,7 +49,7 @@ jobs:
       - run: bash scripts/checks/domain/cicd_sec_05_permissions.sh .
 
   self-cicd-sec-03:
-    name: 'Self-Check: CICD-SEC-03 (Dependency Lock Files)'
+    name: 'Self-Check: 🧩 Code | 🔒 03 — Dependency lockfiles'
     runs-on: ubuntu-latest
     permissions:
       contents: read

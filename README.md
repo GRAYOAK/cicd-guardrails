@@ -7,21 +7,21 @@ Grundlage: [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top
 
 ## Was wird geprüft?
 
-Skripte, Workflow-Job-IDs und Display-Namen folgen einheitlich der OWASP-Designation. Damit ist überall die gleiche Identität sichtbar (Skript ↔ Job ↔ Status-Check ↔ FB_CHECK_ID).
+Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designation. Die **Display-Namen** der Jobs nutzen zwei visuelle Marker: ein Emoji für **Code** vs **Settings**, dann der Text `Code |` bzw. `Settings |`, dann ein **Themen-Emoji** und Kurz-ID mit Titel.
 
-| Designation | Job-ID | Skript | Was wird erkannt |
-|---|---|---|---|
-| `CICD-SEC-01-FLOW` | `cicd-sec-01-flow` | `scripts/checks/domain/cicd_sec_01_flow.sh` | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
-| `CICD-SEC-03` | `cicd-sec-03` | `scripts/checks/domain/cicd_sec_03.sh` | Modulare Package-Pruefung fuer JS/TS, Python, Go, Rust, Ruby und PHP |
-| `CICD-SEC-04` | `cicd-sec-04` | `scripts/checks/domain/cicd_sec_04.sh` | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
-| `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
-| `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
-| `CICD-SEC-05-RUNNER-ACCESS` | `cicd-sec-05-runner-access` | `scripts/checks/domain/cicd_sec_05_runner_access.sh` | Generische self-hosted Runner Labels ohne Segmentierung |
-| `CICD-SEC-06` | `cicd-sec-06` | `scripts/checks/domain/cicd_sec_06.sh` | Hardcoded Secrets via gitleaks |
-| `CICD-SEC-07-RUNNER-HARDENING` | `cicd-sec-07-runner-hardening` | `scripts/checks/domain/cicd_sec_07_runner_hardening.sh` | `--privileged` Container und `sudo` in Workflows |
-| `CICD-SEC-08` | `cicd-sec-08` | `scripts/checks/domain/cicd_sec_08.sh` | Actions mit `@v1`, `@main`, `@latest` statt SHA-Pinning |
+| Designation | Job-ID | Skript | Scope | Was wird erkannt |
+|---|---|---|---|---|
+| `CICD-SEC-01-FLOW` | `cicd-sec-01-flow` | `scripts/checks/domain/cicd_sec_01_flow.sh` | Settings | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
+| `CICD-SEC-03` | `cicd-sec-03` | `scripts/checks/domain/cicd_sec_03.sh` | Code | Modulare Package-Pruefung fuer JS/TS, Python, Go, Rust, Ruby und PHP |
+| `CICD-SEC-04` | `cicd-sec-04` | `scripts/checks/domain/cicd_sec_04.sh` | Code | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
+| `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Code | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
+| `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Settings | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
+| `CICD-SEC-05-RUNNER-ACCESS` | `cicd-sec-05-runner-access` | `scripts/checks/domain/cicd_sec_05_runner_access.sh` | Code | Generische self-hosted Runner Labels ohne Segmentierung |
+| `CICD-SEC-06` | `cicd-sec-06` | `scripts/checks/domain/cicd_sec_06.sh` | Code | Hardcoded Secrets via gitleaks |
+| `CICD-SEC-07-RUNNER-HARDENING` | `cicd-sec-07-runner-hardening` | `scripts/checks/domain/cicd_sec_07_runner_hardening.sh` | Code | `--privileged` Container und `sudo` in Workflows |
+| `CICD-SEC-08` | `cicd-sec-08` | `scripts/checks/domain/cicd_sec_08.sh` | Code | Actions mit `@v1`, `@main`, `@latest` statt SHA-Pinning |
 
-> **Migrationshinweis (Breaking Change):** Job-IDs und Display-Namen wurden auf das einheitliche `cicd-sec-*` Schema umgestellt. Konsumenten müssen ihre `skip-checks`-Eingaben und Branch-Protection-Required-Status-Checks anpassen. Mapping siehe Tabelle.
+> **Migrationshinweis (Breaking Change):** Job-IDs und `skip-checks`-Tokens bleiben `cicd-sec-*`. **Display-Namen** (Scope-Emoji 🧩/⚙️, `Code |` / `Settings |`, Themen-Emoji, Text) müssen in Branch Protection exakt gematcht werden. Nach einem Workflow-Pin-Update ggf. Required-Checks anpassen. Mapping siehe Abschnitt Branch Protection.
 
 ---
 
@@ -89,15 +89,15 @@ GitHub → Repo Settings → Branches → Add rule → `main`:
 - ✅ Require status checks to pass before merging
 - ✅ Require branches to be up to date before merging
 - Required status checks (Display-Namen exakt so eintragen):
-  - `🚨 CICD-SEC-04 (pull_request_target)`
-  - `📌 CICD-SEC-08 (Action SHA-Pinning)`
-  - `🔐 CICD-SEC-05-PERMISSIONS (Workflow permissions)`
-  - `🔒 CICD-SEC-03 (Dependency Lock Files)`
-  - `🕵️ CICD-SEC-06 (Secret Scanning)`
-  - `🖥️ CICD-SEC-05-RUNNER-ACCESS (Runner access policy)`
-  - `🧱 CICD-SEC-07-RUNNER-HARDENING (Runner hardening)`
-  - `🧭 CICD-SEC-01-FLOW (Flow control)` ← nur mit Admin-Token sinnvoll
-  - `🛂 CICD-SEC-05-BRANCH (Branch governance and PBAC)` ← nur mit Admin-Token sinnvoll
+  - `🧩 Code | 🚨 04 — pull_request_target`
+  - `🧩 Code | 📌 08 — Action SHA pinning`
+  - `🧩 Code | 🔐 05-permissions — Workflow permissions`
+  - `🧩 Code | 🔒 03 — Dependency lockfiles`
+  - `🧩 Code | 🕵️ 06 — Secret scanning`
+  - `🧩 Code | 🖥️ 05-runner-access — Runner access`
+  - `🧩 Code | 🧱 07-runner-hardening — Runner hardening`
+  - `⚙️ Settings | 🧭 01-flow — Flow control` ← nur mit Admin-Token sinnvoll
+  - `⚙️ Settings | 🛂 05-branch — Branch governance` ← nur mit Admin-Token sinnvoll
 - ✅ Do not allow bypassing the above settings
 
 ### 4. Migrationsmodus für bestehende Repos
@@ -177,7 +177,8 @@ Die finale Ausgabe im Job `📊 Risk summary` ist auf schnelle Priorisierung opt
 
 - Executive Snapshot mit Anzahl `Critical | High | Medium`
 - Hinweis, wenn Checks per `mode: warn|off` deeskaliert wurden
-- Gruppierung nach Severity
+- Kurzlegend zu **Code** vs **Settings**
+- Pro Schweregrad: Unterblöcke **Code** und **Settings** (API-Checks getrennt von Datei-Checks)
 - Pro Finding immer:
   - Problem
   - Exploit path
@@ -192,13 +193,14 @@ Beispiel (gekürzt):
 - Note: 1 check(s) ran with a per-check override (mode=warn or mode=off) and have been deescalated accordingly.
 
 #### Critical
-1. **CICD-SEC-04** — pull_request_target check
-   - Status: `FAIL`
-   - Problem: Privileged pull request execution can run untrusted contributor-controlled code.
-   - Exploit path: A malicious fork PR can abuse privileged workflow context to execute trusted jobs with untrusted code.
-   - Impact: Pipeline takeover with potential artifact tampering and secret exposure.
-   - Fix first: Avoid pull_request_target for untrusted PRs. Separate privileged jobs and prevent checking out fork head refs.
-   - Reference: [OWASP CICD-SEC-04](https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution/)
+##### Code
+- **CICD-SEC-07-RUNNER-HARDENING** — Runner hardening check
+  - Status: `FAIL`
+  - Problem: ...
+##### Settings
+- **CICD-SEC-01-FLOW** — Flow control policy check
+  - Status: `FAIL`
+  - Problem: ...
 ```
 
 ---
