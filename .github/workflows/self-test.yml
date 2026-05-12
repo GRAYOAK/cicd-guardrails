@@ -22,7 +22,7 @@ jobs:
 
   # ── Dogfood these checks on this repo ─────────────────────────────────────
   self-cicd-sec-04:
-    name: 'Self-Check: 🧩 Code | 🚨 04 — pull_request_target'
+    name: 'Self-Check: 🧩 Code | 🚨 04 — pull request target trigger'
     runs-on: ubuntu-latest
     permissions:
       contents: read

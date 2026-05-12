@@ -89,7 +89,7 @@ GitHub → Repo Settings → Branches → Add rule → `main`:
 - ✅ Require status checks to pass before merging
 - ✅ Require branches to be up to date before merging
 - Required status checks (Display-Namen exakt so eintragen):
-  - `🧩 Code | 🚨 04 — pull_request_target`
+  - `🧩 Code | 🚨 04 — pull request target trigger`
   - `🧩 Code | 📌 08 — Action SHA pinning`
   - `🧩 Code | 🔐 05-permissions — Workflow permissions`
   - `🧩 Code | 🔒 03 — Dependency lockfiles`

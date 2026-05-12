@@ -110,7 +110,7 @@ jobs:
 
   # ── CICD-SEC-04: pull_request_target ──────────────────────────────────────
   cicd-sec-04:
-    name: '🧩 Code | 🚨 04 — pull_request_target'
+    name: '🧩 Code | 🚨 04 — pull request target trigger'
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-04') }}
     runs-on: ubuntu-latest
