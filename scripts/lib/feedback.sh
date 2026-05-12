@@ -13,6 +13,8 @@ FB_NOTICE_COUNT=0
 FB_STATUS="PASS"
 FB_OWASP_REF=""
 FB_MODE="fail"
+FB_FOUND_ROWS=()
+FB_FINDING_DETAIL_MARKDOWN=""
 
 fb__json_escape() {
   local s="${1:-}"
@@ -36,6 +38,8 @@ fb_write_result_json() {
 
   local owasp
   owasp="$(fb__json_escape "$FB_OWASP_REF")"
+  local detail_json
+  detail_json="$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1] or ""))' "${FB_FINDING_DETAIL_MARKDOWN}")"
 
   cat >"$out_path" <<EOF
 {
@@ -48,7 +52,8 @@ fb_write_result_json() {
     "warnings": ${FB_WARNING_COUNT},
     "notices": ${FB_NOTICE_COUNT}
   },
-  "owasp_reference": "${owasp}"
+  "owasp_reference": "${owasp}",
+  "finding_detail_markdown": ${detail_json}
 }
 EOF
 }
@@ -65,6 +70,8 @@ fb_init() {
   FB_NOTICE_COUNT=0
   FB_STATUS="PASS"
   FB_MODE="fail"
+  FB_FOUND_ROWS=()
+  FB_FINDING_DETAIL_MARKDOWN=""
 }
 
 fb_add_searched() {
@@ -101,6 +108,7 @@ fb_report() {
   local file="${3:-}"
   local line="${4:-}"
   local remediation="${5:-}"
+  local ecosystem="${6:-}"
 
   case "$severity" in
     error) FB_ERROR_COUNT=$((FB_ERROR_COUNT + 1)) ;;
@@ -110,15 +118,50 @@ fb_report() {
 
   fb__annotation "$severity" "$file" "$line" "$message"
 
+  local display_line
   if [[ -n "$file" && -n "$line" ]]; then
+    display_line="- [${severity}] ${file}:${line} - ${message}"
     FB_FOUND+="- [${severity}] ${file}:${line} - ${message}"$'\n'
   elif [[ -n "$file" ]]; then
+    display_line="- [${severity}] ${file} - ${message}"
     FB_FOUND+="- [${severity}] ${file} - ${message}"$'\n'
   else
+    display_line="- [${severity}] ${message}"
     FB_FOUND+="- [${severity}] ${message}"$'\n'
   fi
 
+  if [[ -n "$ecosystem" && -n "$file" ]]; then
+    local dir_part="${file%/*}"
+    [[ "$dir_part" == "$file" ]] && dir_part="."
+    FB_FOUND_ROWS+=("${ecosystem}|${dir_part}|${display_line}")
+  fi
+
   fb_add_remediation "$remediation"
+}
+
+fb__render_grouped_found() {
+  if [[ ${#FB_FOUND_ROWS[@]} -eq 0 ]]; then
+    printf '%s' ""
+    return 0
+  fi
+  local sorted
+  sorted="$(printf '%s\n' "${FB_FOUND_ROWS[@]}" | LC_ALL=C sort -t'|' -k1,1 -k2,2)"
+  local out="" cur_eco="" cur_dir=""
+  while IFS='|' read -r eco dir line; do
+    [[ -z "$eco" ]] && continue
+    if [[ "$eco" != "$cur_eco" ]]; then
+      [[ -n "$cur_eco" ]] && out+=$'\n'
+      out+="#### ${eco}"$'\n\n'
+      cur_eco="$eco"
+      cur_dir=""
+    fi
+    if [[ "$dir" != "$cur_dir" ]]; then
+      out+="- **${dir}/**"$'\n'
+      cur_dir="$dir"
+    fi
+    out+="  ${line}"$'\n'
+  done <<<"$sorted"
+  printf '%s' "$out"
 }
 
 fb_set_status() {
@@ -195,6 +238,14 @@ fb_summary() {
   local searched_block="$FB_SEARCHED"
   local found_block="$FB_FOUND"
   local remediation_block="$FB_REMEDIATION"
+
+  if [[ ${#FB_FOUND_ROWS[@]} -gt 0 ]]; then
+    found_block="$(fb__render_grouped_found)"
+    FB_FINDING_DETAIL_MARKDOWN="$found_block"
+    if [[ ${#FB_FINDING_DETAIL_MARKDOWN} -gt 12000 ]]; then
+      FB_FINDING_DETAIL_MARKDOWN="${FB_FINDING_DETAIL_MARKDOWN:0:12000}"$'\n\n…(truncated)'
+    fi
+  fi
 
   if [[ -z "$searched_block" ]]; then
     searched_block="- No explicit search scope provided."$'\n'

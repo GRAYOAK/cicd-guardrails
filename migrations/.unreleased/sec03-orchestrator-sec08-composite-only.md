@@ -1,0 +1,46 @@
+---
+target_version: NEXT
+since_version: any
+severity: breaking
+category: workflow
+affected_consumers: [reusable-workflow, pre-commit]
+---
+
+## What changed
+
+`CICD-SEC-03` now scans the whole repository checkout in phases: package manifests and lockfiles, then GitHub Actions workflow YAML under `.github/workflows` for third-party `uses:` SHA pinning, then Dockerfiles for digest-pinned `FROM` lines. `CICD-SEC-08` only scans composite action definitions under `actions/**/action.y{a}ml`. Optional per-repository overlay `.guardrails.file-patterns.yml` can add `global_excludes` and `validation_skip_paths` when `yq` is available.
+
+## Why
+
+Avoid duplicate workflow scanning between two jobs, centralize repository discovery in one orchestrator, and give consumers a single optional configuration file for excludes and validation skips without replacing built-in defaults.
+
+## Required action for consumer repos
+
+- Expect workflow action-pin findings from the **`cicd-sec-03`** job (reusable workflow) instead of **`cicd-sec-08`** for files under `.github/workflows/`.
+- Keep using **`cicd-sec-08`** for composite actions under `actions/` only. If you relied on SEC-08 alone for workflow YAML, add or rely on SEC-03 in required checks.
+- If you use local **pre-commit** hooks from this repo: align hook `files` filters — SEC-08 hooks should only match `actions/**`; workflow YAML is covered by the SEC-03 hook pattern.
+- Optionally add `.guardrails.file-patterns.yml` next to `.guardrails.yml` for extra `find` excludes or `validation_skip_paths` (see guardrails `README.md` and `.guardrails.file-patterns.reference.yml`).
+
+## Detection
+
+```bash
+# Consumer still pins only SEC-08 but has no actions/ tree — SEC-08 may report SKIPPED while SEC-03 reports workflow pin issues.
+test -d actions && echo "has composite actions" || echo "no actions dir"
+grep -R "uses:.*@[^[:space:]]\{1,39\}[[:space:]]*$" .github/workflows 2>/dev/null || true
+```
+
+## Code examples
+
+### Before
+
+```yaml
+# Required checks listed only SEC-08 for "all action pinning"
+# Mental model: SEC-08 covered .github/workflows and actions/
+```
+
+### After
+
+```yaml
+# Required checks: include SEC-03 for dependency + workflow YAML + Dockerfile surface
+# Include SEC-08 for composite actions under actions/ only
+```

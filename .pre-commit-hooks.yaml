@@ -12,7 +12,7 @@
   entry: scripts/checks/domain/cicd_sec_08.sh .
   language: script
   pass_filenames: false
-  files: ^(\.github/workflows/.*\.(yml|yaml)|actions/.*/action\.(yml|yaml))$
+  files: ^actions/.*/action\.(yml|yaml)$
 
 - id: cicd-sec-05-permissions
   name: CICD-SEC-05-PERMISSIONS (Workflow permissions)
@@ -44,7 +44,7 @@
   entry: scripts/checks/domain/cicd_sec_03.sh .
   language: script
   pass_filenames: false
-  files: (^|.*/)(package\.json|pyproject\.toml|requirements[^/]*\.txt|go\.mod|Cargo\.toml|Gemfile|composer\.json)$
+  files: (^|.*/)(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|pyproject\.toml|requirements[^/]*\.txt|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|composer\.json|composer\.lock|Dockerfile[^/]*|\.github/workflows/.*\.(yml|yaml))$
 
 - id: cicd-sec-06
   name: CICD-SEC-06 (Secret scanning)

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Christopher-Rust/cicd-guardrails/main/.guardrails.file-patterns.schema.json",
+  "title": "Optional file scan overlay for cicd-guardrails",
+  "description": "Optional `.guardrails.file-patterns.yml` in the scanned repository. Merges additively with built-in defaults shipped in the guardrails scripts.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "global_excludes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Additional find -not -path globs merged with built-in excludes."
+    },
+    "validation_skip_paths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Relative paths still discovered but excluded from manifest and lock policy validation for CICD-SEC-03."
+    }
+  }
+}

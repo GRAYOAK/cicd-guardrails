@@ -10,14 +10,23 @@ disable-model-invocation: true
 
 Use this skill for changes in:
 - `scripts/checks/domain/cicd_sec_*.sh` (domain checks)
+- `scripts/checks/domain/package/*.sh` (CICD-SEC-03 ecosystem audits)
 - `scripts/checks/tech/*.sh` (technical adapters)
 - `scripts/lib/feedback.sh`
 - `scripts/lib/config.sh`
+- `scripts/lib/file_patterns.sh`
+- `scripts/lib/action_pin_audit.sh`
+- `scripts/lib/dockerfile_pin_audit.sh`
 - `scripts/aggregate_risk_summary.sh`
 - `.guardrails.schema.json`
 - `.guardrails.example.yml`
+- `.guardrails.file-patterns.schema.json`
+- `.guardrails.file-patterns.reference.yml`
 - `.github/workflows/full-scan.yml`
 - `.github/workflows/self-test.yml`
+- `.github/workflows/release.yml` and `release-please-config.json` (when release or changelog behaviour is touched)
+- `migrations/README.md`, `migrations/TEMPLATE.md`, `migrations/.unreleased/*.md` (consumer migration snippets)
+- `CHANGELOG.md` (only when repository policy allows manual edits; otherwise rely on Conventional Commits and release-please)
 - `tests/test_checks.sh`
 - `README.md`
 
@@ -68,16 +77,17 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
 4. Propagate to check scripts with minimal duplication.
 5. Ensure reusable workflow still uploads/downstreams artifacts expected by summary jobs.
 6. Update docs for any behavior change (`README.md`).
-7. Document the current software state in `workspace:Main`.
-8. Run tests and sanity checks:
+7. **Release and consumer hygiene** (always; see subsection below).
+8. Document the current software state in `workspace:Main`.
+9. Run tests and sanity checks:
    - `bash ./tests/test_checks.sh`
    - lints/diagnostics for edited files
-9. Run a bash-and-workflow quality review with a dedicated subagent after tests pass:
+10. Run a bash-and-workflow quality review with a dedicated subagent after tests pass:
    - Specialist scope: bash scripting and GitHub Actions workflow design.
    - Review focus: best practices, security weaknesses, reliability risks, and maintainability issues.
    - Required output: prioritized findings with severity, concrete remediation guidance, and whether changes are blocking.
    - If findings are actionable, apply fixes and rerun tests/sanity checks before continuing.
-10. Run a skill-structure review with a dedicated skill-specialist subagent before finalizing:
+11. Run a skill-structure review with a dedicated skill-specialist subagent before finalizing:
    - Goal: decide whether this skill should be split into multiple files and/or multiple focused skills.
    - Scope: responsibilities, section size, coupling, reuse potential, and maintenance overhead.
    - Output: explicit recommendation with rationale:
@@ -85,7 +95,15 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
      - split into multiple files within one skill
      - split into multiple standalone skills
    - If split is recommended, include a proposed target structure and migration order.
-11. Always finish with a learning proposal block that the user can accept or reject per item.
+12. Always finish with a learning proposal block that the user can accept or reject per item.
+
+### Release, changelog, and migrations (mandatory)
+
+- **`CHANGELOG.md`**: this repository uses **release-please** (`release.yml` + `release-please-config.json`). Do **not** hand-edit the changelog when the file header states automation ownership. Ship user-visible history through **Conventional Commits** (`feat:`, `fix:`, `perf:`, …) so the release PR updates `CHANGELOG.md`.
+- **Breaking changes** (`feat!:`, `fix!:`, or `BREAKING CHANGE:` footer): add at least one new snippet under `migrations/.unreleased/<short-slug>.md` copied from `migrations/TEMPLATE.md` so **migration-guard** passes and `release.yml` can assemble `migrations/vX.Y.Z.md` on cut.
+- **Non-breaking but consumer-visible** scan surface, job expectations, or hook `files` filters: still add an `.unreleased` snippet when operators or pinned callers must act; otherwise update `README.md` and demo repos clearly.
+- **Demo repositories** (`cicd-demo-errors`, `cicd-demo-well`): keep them aligned with reusable-workflow behavior and local hook patterns whenever checks change what they exercise.
+- After a version exists, consumers should read `migrations/vX.Y.Z.md` from the GitHub Release assets together with `CHANGELOG.md`.
 
 ## Reference files
 
@@ -131,6 +149,9 @@ When behavior changes are user-facing, update both repositories and keep their w
 - Tests pass: `bash ./tests/test_checks.sh`
 - No new diagnostics in edited files.
 - Workflow wiring still consistent for artifacts and final summary job.
-- README reflects behavior for users of reusable workflow.
-- Schema/example docs and consumer config examples are consistent.
+- README reflects behavior for users of reusable workflow (including migration and changelog policy when relevant).
+- Schema, example docs, and consumer config examples are consistent.
+- **Changelog policy**: no forbidden manual edits to `CHANGELOG.md`; commits follow Conventional Commits so release-please can update the changelog.
+- **Migrations**: breaking PRs include new `migrations/.unreleased/*.md`; consumer-visible changes either add snippets or clearly update README and demo repos.
+- **Demo repositories** (`cicd-demo-errors`, `cicd-demo-well`) updated when check behaviour or fixtures change.
 - Current software state is documented in `workspace:Main`.
