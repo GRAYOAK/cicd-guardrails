@@ -1,0 +1,151 @@
+name: Release
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Release pipeline driven by release-please.
+#
+# Conventional Commits on `main` → release-please opens / updates a "release PR"
+# that bumps the version in .release-please-manifest.json and updates CHANGELOG.md.
+#
+# When that release PR is merged, release-please atomically creates:
+#   - the GitHub Release `vX.Y.Z`
+#   - the matching git tag `vX.Y.Z`
+#
+# A second job then assembles `migrations/v<X.Y.Z>.md` from the snippets that
+# were collected under `migrations/.unreleased/` and uploads it as a release
+# asset together with `CHANGELOG.md`.
+#
+# Consumer repos must keep pinning the reusable workflow on a 40-character
+# commit SHA. Tags are reference markers only.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  # ── Open / update release PR, or cut a release when the PR is merged ──────
+  release-please:
+    name: 'release-please'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+      version: ${{ steps.rp.outputs.version }}
+      major: ${{ steps.rp.outputs.major }}
+      minor: ${{ steps.rp.outputs.minor }}
+      patch: ${{ steps.rp.outputs.patch }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071  # v4.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # ── Consolidate migration snippets into a per-version migration file ──────
+  assemble-migration:
+    name: 'Assemble migration notes'
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.release-please.outputs.version }}
+      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout main at the new tag
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Determine previous version
+        id: prev
+        run: |
+          set -euo pipefail
+          PREV="$(git tag --list 'v*.*.*' --sort=-v:refname | grep -vx "${TAG_NAME}" | head -n1 || true)"
+          if [ -z "$PREV" ]; then
+            PREV="none"
+          fi
+          echo "previous=${PREV}" >> "$GITHUB_OUTPUT"
+          echo "Previous version: ${PREV}"
+
+      - name: Assemble migrations/v${{ env.VERSION }}.md
+        env:
+          PREV_VERSION: ${{ steps.prev.outputs.previous }}
+        run: |
+          set -euo pipefail
+          OUT="migrations/v${VERSION}.md"
+          mkdir -p migrations/.unreleased
+
+          shopt -s nullglob
+          SNIPPETS=( migrations/.unreleased/*.md )
+
+          RELEASED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          if [ ${#SNIPPETS[@]} -eq 0 ]; then
+            SEVERITY="none"
+          else
+            SEVERITY="see-snippets"
+          fi
+
+          {
+            echo "---"
+            echo "version: ${VERSION}"
+            echo "previous_version: ${PREV_VERSION}"
+            echo "released_at: ${RELEASED_AT}"
+            echo "severity: ${SEVERITY}"
+            echo "---"
+            echo
+            echo "# Migration notes for v${VERSION}"
+            echo
+            if [ ${#SNIPPETS[@]} -eq 0 ]; then
+              echo "No migration steps required for this release."
+            else
+              echo "Apply the following changes to consumer repositories before pinning the new SHA."
+              echo
+              for f in $(printf '%s\n' "${SNIPPETS[@]}" | sort); do
+                base="$(basename "$f" .md)"
+                echo "## Change: ${base}"
+                echo
+                cat "$f"
+                echo
+              done
+            fi
+          } > "$OUT"
+
+          if [ ${#SNIPPETS[@]} -gt 0 ]; then
+            git rm -f "${SNIPPETS[@]}"
+          fi
+          git add "$OUT"
+
+      - name: Commit migration notes back to main
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          if git diff --cached --quiet; then
+            echo 'No migration notes to commit.'
+            exit 0
+          fi
+
+          git commit -m "chore(release): finalize migration notes for ${TAG_NAME} [skip ci]"
+          git push origin main
+
+      - name: Upload release assets
+        run: |
+          set -euo pipefail
+          ASSETS=( "migrations/v${VERSION}.md" CHANGELOG.md )
+          gh release upload "${TAG_NAME}" "${ASSETS[@]}" --clobber

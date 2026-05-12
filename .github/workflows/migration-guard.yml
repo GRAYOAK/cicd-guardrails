@@ -1,0 +1,119 @@
+name: Migration Guard
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Enforces that every breaking change carries a migration snippet under
+# `migrations/.unreleased/`.
+#
+# A commit is considered breaking if either:
+#   * the Conventional-Commit header type ends with `!` (for example `feat!:`)
+#   * the commit body contains a `BREAKING CHANGE:` footer
+#
+# When a breaking commit is present in the PR, the job fails unless the PR
+# adds at least one new file under `migrations/.unreleased/` whose YAML
+# front-matter declares the required fields.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  migration-guard:
+    name: 'Migration guard'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout PR head with full history
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Detect breaking-change commits in the PR
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          BREAKING=0
+          while IFS= read -r line; do
+            if [ -z "$line" ]; then continue; fi
+            if printf '%s\n' "$line" | grep -Eq '^[a-zA-Z]+(\([^)]+\))?!:'; then
+              BREAKING=1
+            fi
+          done < <(git log --format='%s' "${BASE_SHA}..${HEAD_SHA}")
+
+          if [ "$BREAKING" -eq 0 ]; then
+            if git log --format='%B' "${BASE_SHA}..${HEAD_SHA}" \
+                 | grep -Eq '^BREAKING CHANGE:'; then
+              BREAKING=1
+            fi
+          fi
+
+          echo "breaking=${BREAKING}" >> "$GITHUB_OUTPUT"
+          if [ "$BREAKING" -eq 1 ]; then
+            echo 'Breaking change detected in commits.'
+          else
+            echo 'No breaking change detected.'
+          fi
+
+      - name: Verify migration snippet is present
+        if: ${{ steps.detect.outputs.breaking == '1' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mapfile -t ADDED < <(git diff --name-only --diff-filter=A "${BASE_SHA}" "${HEAD_SHA}" \
+            | grep -E '^migrations/\.unreleased/.+\.md$' || true)
+
+          if [ ${#ADDED[@]} -eq 0 ]; then
+            echo '::error::Breaking-change commit detected, but no new file under migrations/.unreleased/*.md was added in this PR.'
+            echo '::error::Copy migrations/TEMPLATE.md to migrations/.unreleased/<short-pr-slug>.md and fill it in before merging.'
+            exit 1
+          fi
+
+          echo "Migration snippets added in this PR:"
+          printf ' - %s\n' "${ADDED[@]}"
+
+      - name: Install yq
+        if: ${{ steps.detect.outputs.breaking == '1' }}
+        uses: mikefarah/yq@b534aa9ee5d38001fba3cd8fe254a037e4847b37  # v4.47.2
+
+      - name: Validate front-matter of new snippets
+        if: ${{ steps.detect.outputs.breaking == '1' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          REQUIRED_KEYS=(target_version since_version severity category affected_consumers)
+
+          mapfile -t SNIPPETS < <(git diff --name-only --diff-filter=A "${BASE_SHA}" "${HEAD_SHA}" \
+            | grep -E '^migrations/\.unreleased/.+\.md$' || true)
+
+          FAIL=0
+          for f in "${SNIPPETS[@]}"; do
+            echo "Validating $f"
+            FRONT="$(awk 'BEGIN{n=0} /^---[[:space:]]*$/{n++; next} n==1{print} n>=2{exit}' "$f")"
+            if [ -z "$FRONT" ]; then
+              echo "::error file=$f::missing YAML front-matter (--- ... ---)"
+              FAIL=1
+              continue
+            fi
+            for key in "${REQUIRED_KEYS[@]}"; do
+              VAL="$(printf '%s\n' "$FRONT" | yq ".${key} // \"\"" - 2>/dev/null || true)"
+              if [ -z "$VAL" ] || [ "$VAL" = "null" ]; then
+                echo "::error file=$f::missing required front-matter key: ${key}"
+                FAIL=1
+              fi
+            done
+          done
+
+          exit "$FAIL"
