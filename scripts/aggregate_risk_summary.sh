@@ -350,6 +350,21 @@ for r in "${sorted[@]}"; do
   if [[ -n "$owasp" ]]; then
     entry+="  - Reference: [${reference_label}](${owasp})\n"
   fi
+  detail=""
+  for jf in "${best_effort_results[@]}"; do
+    match_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["check_id"])' "$jf")"
+    if [[ "$match_id" != "$check_id" ]]; then
+      continue
+    fi
+    detail="$(python3 -c 'import json,sys
+p=sys.argv[1]
+d=json.load(open(p)).get("finding_detail_markdown") or ""
+print(d[:4000] if d else "")' "$jf")"
+    break
+  done
+  if [[ -n "$detail" ]]; then
+    entry+="  - Finding detail (truncated):\n\n\`\`\`\n${detail}\n\`\`\`\n\n"
+  fi
   entry+="\n"
 
   case "$severity" in

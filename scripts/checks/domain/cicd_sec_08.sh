@@ -8,52 +8,45 @@ ROOT_SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${ROOT_SCRIPTS_DIR}/lib/feedback.sh"
 # shellcheck source=scripts/lib/config.sh
 source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
+# shellcheck source=scripts/lib/file_patterns.sh
+source "${ROOT_SCRIPTS_DIR}/lib/file_patterns.sh"
+# shellcheck source=scripts/lib/action_pin_audit.sh
+source "${ROOT_SCRIPTS_DIR}/lib/action_pin_audit.sh"
 
-PATH_ROOT="${1:-.}"
+PATH_ROOT_ARG="${1:-.}"
+PATH_ROOT="$(cd "$PATH_ROOT_ARG" && pwd)"
 
 fb_init "CICD-SEC-08" "Action pinning check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"
 cfg_init "$PATH_ROOT"
 fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
-fb_add_searched "Workflow and composite action files"
+
+if [[ "$FB_MODE" == "off" ]]; then
+  fb_set_status "SKIPPED"
+  fb_add_remediation "Check disabled via configuration."
+  fb_summary
+  exit "$(fb_exit_code false false)"
+fi
+
+fp_init "$PATH_ROOT"
+
+fb_add_searched "Composite action definitions under actions/ directory"
 fb_add_searched "uses: references that are not pinned to a full 40-char SHA"
 fb_add_searched "Disallowed refs such as tags, branches, latest, or missing @"
 
-shopt -s nullglob
-files=("$PATH_ROOT"/.github/workflows/*.yml "$PATH_ROOT"/.github/workflows/*.yaml)
-while IFS= read -r action_file; do
-  files+=("$action_file")
-done < <(find "$PATH_ROOT/actions" -type f \( -name "action.yml" -o -name "action.yaml" \) 2>/dev/null || true)
+files=()
+while IFS= read -r f; do
+  [[ -n "$f" ]] && files+=("$f")
+done < <(fp_find_composite_actions)
 
 if [[ ${#files[@]} -eq 0 ]]; then
   fb_set_status "SKIPPED"
-  fb_add_remediation "No workflow or action files found; no action required."
+  fb_add_remediation "No composite action files under actions/; no action required."
   fb_summary
   exit "$(fb_exit_code false false)"
 fi
 
 for file in "${files[@]}"; do
-  rel="${file#"$PATH_ROOT/"}"
-
-  findings="$(awk '
-    /^[[:space:]]*#/ { next }
-    {
-      line = $0
-      sub(/#.*$/, "", line)
-      if (line !~ /uses:/) next
-      if (line ~ /uses:[[:space:]]*\.\//) next
-      if (line ~ /@[0-9a-f]{40}[[:space:]]*$/) next
-      print NR ": " $0
-    }
-  ' "$file")"
-
-  if [[ -n "$findings" ]]; then
-    while IFS= read -r match; do
-      linenum="${match%%:*}"
-      ref="$(echo "$match" | sed -E 's/^[0-9]+:[[:space:]]*//' | sed -E 's/.*uses:[[:space:]]*//')"
-      fb_report "error" "Unpinned action reference '${ref}'." "$rel" "$linenum" \
-        "Pin every third-party action to a full commit SHA."
-    done <<<"$findings"
-  fi
+  action_pin_scan_file "$PATH_ROOT" "$file" "composite-action" || true
 done
 
 fb_auto_status false

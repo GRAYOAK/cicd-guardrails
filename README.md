@@ -12,14 +12,14 @@ Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designa
 | Designation | Job-ID | Skript | Scope | Was wird erkannt |
 |---|---|---|---|---|
 | `CICD-SEC-01-FLOW` | `cicd-sec-01-flow` | `scripts/checks/domain/cicd_sec_01_flow.sh` | Settings | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
-| `CICD-SEC-03` | `cicd-sec-03` | `scripts/checks/domain/cicd_sec_03.sh` | Code | Modulare Package-Pruefung fuer JS/TS, Python, Go, Rust, Ruby und PHP |
+| `CICD-SEC-03` | `cicd-sec-03` | `scripts/checks/domain/cicd_sec_03.sh` | Code | Manifeste, Lockfiles, Workflow-`uses:`-SHA-Pins, Dockerfile-Basis-Images (digest); zentraler `find` im Skript |
 | `CICD-SEC-04` | `cicd-sec-04` | `scripts/checks/domain/cicd_sec_04.sh` | Code | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
 | `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Code | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
 | `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Settings | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
 | `CICD-SEC-05-RUNNER-ACCESS` | `cicd-sec-05-runner-access` | `scripts/checks/domain/cicd_sec_05_runner_access.sh` | Code | Generische self-hosted Runner Labels ohne Segmentierung |
 | `CICD-SEC-06` | `cicd-sec-06` | `scripts/checks/domain/cicd_sec_06.sh` | Code | Hardcoded Secrets via gitleaks |
 | `CICD-SEC-07-RUNNER-HARDENING` | `cicd-sec-07-runner-hardening` | `scripts/checks/domain/cicd_sec_07_runner_hardening.sh` | Code | `--privileged` Container und `sudo` in Workflows |
-| `CICD-SEC-08` | `cicd-sec-08` | `scripts/checks/domain/cicd_sec_08.sh` | Code | Actions mit `@v1`, `@main`, `@latest` statt SHA-Pinning |
+| `CICD-SEC-08` | `cicd-sec-08` | `scripts/checks/domain/cicd_sec_08.sh` | Code | Composite Actions unter `actions/` — gleiche Pin-Regeln wie Workflows in SEC-03 |
 
 > **Migrationshinweis (Breaking Change):** Job-IDs und `skip-checks`-Tokens bleiben `cicd-sec-*`. **Display-Namen** (Scope-Emoji 🧩/⚙️, `Code |` / `Settings |`, Themen-Emoji, Text) müssen in Branch Protection exakt gematcht werden. Nach einem Workflow-Pin-Update ggf. Required-Checks anpassen. Mapping siehe Abschnitt Branch Protection.
 
@@ -145,10 +145,21 @@ Wie die Werte einfließen:
 - `visibility=public` erhöht Risiko-Gewichtung für `CICD-SEC-04`, `CICD-SEC-06`, `CICD-SEC-08`
 - `software_type=open_source` gewichtet Supply-Chain/Exposure höher
 - `runner_type=self_hosted` gewichtet Runner-Access- und Hardening-Themen höher
-- `container_registry=public` erhöht Supply-Chain-Gewichtung (vor allem `CICD-SEC-08`, dann `CICD-SEC-06` und `CICD-SEC-04`); `private_network` reduziert sie geringfügig
+- `container_registry=public` erhöht Supply-Chain-Gewichtung (vor allem `CICD-SEC-08` und Workflow-Pins in `CICD-SEC-03`, dann `CICD-SEC-06` und `CICD-SEC-04`); `private_network` reduziert sie geringfügig
 - `data_sensitivity=high` und `deployment_criticality=prod|regulated` erhöhen Priorität für Secrets, Permissions und Runner-Kontrollen
 
 Fehlt die Datei, nutzt Guardrails konservative Defaults und schreibt das transparent ins Summary.
+
+#### Optional: Dateiscan-Overlay (`.guardrails.file-patterns.yml`)
+
+Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03` leben in den Skripten; Consumer-Repos **müssen** keine Kopie pflegen. Optional kann das Ziel-Repo **zusätzliche** Einträge setzen:
+
+- `global_excludes` — weitere `find -not -path` Muster (additiv zu den Defaults)
+- `validation_skip_paths` — relative Pfade, die zwar gefunden, aber **ohne** Manifest-/Lock-Policy geprüft werden
+
+Schema: [`.guardrails.file-patterns.schema.json`](.guardrails.file-patterns.schema.json). Handler- und Dateizuordnung (Referenz, nicht zum Kopieren ins Zielrepo erforderlich): [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml). Einlesen der Overlay-Datei erfolgt mit `yq`; fehlt `yq` oder die Datei, bleiben die eingebauten Defaults aktiv.
+
+**Upgrades für Consumer:** siehe [`migrations/README.md`](migrations/README.md). Während der Entwicklung Snippets unter [`migrations/.unreleased/`](migrations/.unreleased/) ergänzen; beim Release werden sie zu `migrations/vX.Y.Z.md` zusammengeführt. Die [`CHANGELOG.md`](CHANGELOG.md) wird durch **release-please** aus **Conventional Commits** gepflegt — nicht manuell umschreiben, wenn die Datei das so vorsieht; sichtbare Änderungen über Commit-Messages (`feat:`, `fix:`, `feat!:` usw.) einspielen.
 
 ### 6. Pro-Check Severity-Override
 

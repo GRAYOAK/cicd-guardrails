@@ -123,9 +123,10 @@ teardown
 echo ""
 echo "▶ cicd_sec_08.sh"
 setup
-cp "$FIXTURES_DIR/bad-pinning.yml" "$TMP/.github/workflows/ci.yml"
+mkdir -p "$TMP/actions/sample"
+cp "$FIXTURES_DIR/bad-pinning.yml" "$TMP/actions/sample/action.yml"
 run_check "$DOMAIN_DIR/cicd_sec_08.sh" "$TMP"
-assert_exit "detects unpinned action references" 1 "$LAST_EXIT"
+assert_exit "detects unpinned action references in composite action" 1 "$LAST_EXIT"
 teardown
 
 echo ""
@@ -144,6 +145,27 @@ echo '{"name":"demo"}' > "$TMP/package.json"
 run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
 assert_exit "fails when npm lockfile is missing" 1 "$LAST_EXIT"
 teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh validation_skip_paths (requires yq)"
+if command -v yq >/dev/null 2>&1; then
+  setup
+  mkdir -p "$TMP/vendor/nested" "$TMP/apps/web"
+  echo '{"name":"v"}' >"$TMP/vendor/nested/package.json"
+  echo '{}' >"$TMP/vendor/nested/package-lock.json"
+  echo '{"name":"w"}' >"$TMP/apps/web/package.json"
+  echo '{}' >"$TMP/apps/web/yarn.lock"
+  cat >"$TMP/.guardrails.file-patterns.yml" <<'EOF'
+version: 1
+validation_skip_paths:
+  - "vendor/*"
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+  assert_exit "passes when vendor tree skipped and app has lockfile" 0 "$LAST_EXIT"
+  teardown
+else
+  echo "  (skipped: yq not installed)"
+fi
 
 echo ""
 echo "▶ cicd_sec_03.sh monorepo with mixed services"

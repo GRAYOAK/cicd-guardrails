@@ -141,7 +141,9 @@ jobs:
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── CICD-SEC-08: Action SHA-Pinning ───────────────────────────────────────
+  # CICD-SEC-08 scans composite actions under actions/ only. Workflow YAML pinning
+  # under .github/workflows is covered by CICD-SEC-03 to avoid duplicate findings.
+  # ── CICD-SEC-08: Action SHA-Pinning (composite actions) ───────────────────
   cicd-sec-08:
     name: '🧩 Code | 📌 08 — Action SHA pinning'
     needs: setup

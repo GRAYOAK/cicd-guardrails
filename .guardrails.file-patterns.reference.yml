@@ -1,0 +1,32 @@
+# Reference: built-in handler mapping (do not copy into consumer repos as a requirement).
+# Consumer repos may add `.guardrails.file-patterns.yml` for optional overlays only.
+#
+# policy_handler / artifact        implementation (relative to guardrails repo)
+# ---------------------------------------------------------------------------
+# js_ts / package.json              scripts/checks/domain/package/js_ts.sh — cicd_sec_03_audit_js_ts_package_json
+# js_ts / package-lock.json        same — cicd_sec_03_audit_js_ts_lock_package_lock
+# js_ts / yarn.lock                same — cicd_sec_03_audit_js_ts_lock_yarn
+# js_ts / pnpm-lock.yaml           same — cicd_sec_03_audit_js_ts_lock_pnpm
+# python / pyproject.toml          scripts/checks/domain/package/python.sh — cicd_sec_03_audit_python_pyproject
+# python / requirements*.txt       same — cicd_sec_03_audit_python_requirements
+# python / poetry.lock             same — cicd_sec_03_audit_python_lock_poetry
+# python / uv.lock                 same — cicd_sec_03_audit_python_lock_uv
+# go / go.mod                      scripts/checks/domain/package/go.sh — cicd_sec_03_audit_go_mod
+# go / go.sum                      same — cicd_sec_03_audit_go_sum
+# rust / Cargo.toml                scripts/checks/domain/package/rust.sh — cicd_sec_03_audit_rust_cargo_toml
+# rust / Cargo.lock                same — cicd_sec_03_audit_rust_cargo_lock
+# ruby / Gemfile                   scripts/checks/domain/package/ruby.sh — cicd_sec_03_audit_ruby_gemfile
+# ruby / Gemfile.lock              same — cicd_sec_03_audit_ruby_gemfile_lock
+# php / composer.json              scripts/checks/domain/package/php.sh — cicd_sec_03_audit_php_composer_json
+# php / composer.lock              same — cicd_sec_03_audit_php_composer_lock
+# workflows / *.yml, *.yaml       scripts/lib/action_pin_audit.sh — action_pin_scan_file (ecosystem workflows)
+# docker / Dockerfile*             scripts/lib/dockerfile_pin_audit.sh — dockerfile_pin_scan_file
+# composite-action / action.yml  scripts/lib/action_pin_audit.sh — action_pin_scan_file (ecosystem composite-action)
+
+version: 1
+global_excludes:
+  - "*/.git/*"
+  - "*/node_modules/*"
+  - "*/.venv/*"
+  - "*/target/*"
+validation_skip_paths: []
