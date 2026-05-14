@@ -166,7 +166,17 @@ Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03` leben in den Skripte
 
 Merge-Verhalten: Ohne `yq` wird die mitgelieferte Default-Datei unverändert verwendet. Mit `yq` werden `package_policy.python`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
 
-Schema: [`.guardrails.file-patterns.schema.json`](.guardrails.file-patterns.schema.json). Handler- und Dateizuordnung (Referenz, nicht zum Kopieren ins Zielrepo erforderlich): [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml). Python-Defaults (Referenz, im Guardrails-Repo versioniert): [`scripts/config/package_policy.defaults.yml`](scripts/config/package_policy.defaults.yml). Einlesen der Overlay-Datei erfolgt mit `yq`; fehlt `yq` oder die Datei, bleiben die eingebauten Defaults aktiv (Python-Policy aus der Default-Datei, andere Ausschlüsse wie bisher).
+**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse im Guardrails-Skript-Helfer, danach die flache Python-Default-Datei [`scripts/config/package_policy.defaults.yml`](scripts/config/package_policy.defaults.yml), zuletzt optional das Overlay im Zielrepo. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) im Guardrails-Repository ist **nur Dokumentation** (Handler-Tabelle, Spiegel der Built-in-Excludes, vollständiges Spiegelbild von `package_policy.python`); sie wird von den Checks **nicht** eingelesen. Wenn `yq` installiert ist, stellt `tests/test_checks.sh` sicher, dass der Block `package_policy.python` in der Referenzdatei mit der mitgelieferten Default-Datei übereinstimmt — bei Änderungen an der Default-Datei die Referenz im selben Change Set anpassen.
+
+Schema: [`.guardrails.file-patterns.schema.json`](.guardrails.file-patterns.schema.json). Handler- und Dateizuordnung sowie das dokumentierte Default-Spiegelbild: [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml). Einlesen der Overlay-Datei im gescannten Repo erfolgt mit `yq`; fehlt `yq` oder die Overlay-Datei, bleiben die eingebauten Defaults aktiv (Python-Policy aus der Default-Datei, andere Ausschlüsse wie bisher).
+
+Beispiel für ein kleines, risikoarmes Overlay (nur Pfade von der Validierung ausnehmen, Policy nicht abschwächen):
+
+```yaml
+version: 1
+validation_skip_paths:
+  - "third_party/fixtures/*"
+```
 
 **Upgrades für Consumer:** siehe [`migrations/README.md`](migrations/README.md). Während der Entwicklung Snippets unter [`migrations/.unreleased/`](migrations/.unreleased/) ergänzen; beim Release werden sie zu `migrations/vX.Y.Z.md` zusammengeführt. Die [`CHANGELOG.md`](CHANGELOG.md) wird durch **release-please** aus **Conventional Commits** gepflegt — nicht manuell umschreiben, wenn die Datei das so vorsieht; sichtbare Änderungen über Commit-Messages (`feat:`, `fix:`, `feat!:` usw.) einspielen.
 

@@ -117,6 +117,7 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
 
 ## Reference files
 
+- `.guardrails.file-patterns.reference.yml` (repository root): documents effective file-scan defaults for operators; the `package_policy.python` subtree must remain identical to `scripts/config/package_policy.defaults.yml`. The test suite compares both when `yq` is available — update the reference mirror in the same change set whenever the shipped defaults file changes.
 - `reference-policies.md`:
   - exit semantics
   - engineering principles
