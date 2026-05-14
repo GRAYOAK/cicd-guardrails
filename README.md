@@ -180,6 +180,24 @@ validation_skip_paths:
 
 **Upgrades für Consumer:** siehe [`migrations/README.md`](migrations/README.md). Während der Entwicklung Snippets unter [`migrations/.unreleased/`](migrations/.unreleased/) ergänzen; beim Release werden sie zu `migrations/vX.Y.Z.md` zusammengeführt. Die [`CHANGELOG.md`](CHANGELOG.md) wird durch **release-please** aus **Conventional Commits** gepflegt — nicht manuell umschreiben, wenn die Datei das so vorsieht; sichtbare Änderungen über Commit-Messages (`feat:`, `fix:`, `feat!:` usw.) einspielen.
 
+#### Demo-Repos: automatischer Pin-Bump nach Release
+
+Die Fixture-Repositories [`cicd-demo-errors`](https://github.com/Christopher-Rust/cicd-demo-errors) und [`cicd-demo-well`](https://github.com/Christopher-Rust/cicd-demo-well) können nach jedem erfolgreichen Release automatisch ein `repository_dispatch`-Ereignis erhalten und daraufhin einen PR öffnen, der `security.yml` und `.pre-commit-config.yaml` auf den **Release-Tag-Commit-SHA** hebt.
+
+Voraussetzungen:
+
+1. In beiden Demo-Repos existiert der Workflow [`.github/workflows/guardrails-release-bump.yml`](.github/workflows/guardrails-release-bump.yml) (löst nur auf `guardrails-release` aus).
+2. Eine **GitHub App** (neu oder bestehend) mit Zugriff auf beide Demo-Repos:
+   - Unter *GitHub App settings* → **Permissions & events** → **Repository permissions** → **Contents**: *Read and write* (für `repository_dispatch` auf dem Ziel-Repo).
+   - App auf **cicd-demo-errors** und **cicd-demo-well** installieren (*Install App* → nur diese beiden Repos auswählen). Die App muss nicht auf **cicd-guardrails** installiert sein; der Release-Workflow nutzt nur App-ID und Private Key, um ein Installation-Token für die Demo-Installation zu minten.
+3. Im **cicd-guardrails**-Repository unter *Settings* → *Secrets and variables* → *Actions* zwei Secrets anlegen:
+   - **`GUARDRAILS_CONSUMER_DISPATCH_APP_ID`** — numerische App-ID (Profilseite der App).
+   - **`GUARDRAILS_CONSUMER_DISPATCH_APP_PRIVATE_KEY`** — vollständiger PEM-Inhalt des generierten Private Keys (einschließlich `BEGIN`/`END`-Zeilen).
+
+Ohne diese beiden Secrets bleibt der Release-Workflow grün; der Job `notify-demo-repos` überspringt das Dispatch mit Loghinweis. Sind die Secrets gesetzt und das Minting des Tokens schlägt fehl (falscher Key, App nicht auf den Demos installiert), wird ebenfalls übersprungen. Schlägt das Minting zu, aber **alle** Dispatch-Aufrufe fehl, wird der Job rot (Konfigurationsfehler).
+
+**Benachrichtigung:** GitHub benachrichtigt Abonnenten wie bei jedem anderen neuen PR (Watch → *Pull requests* oder *Participating*). Zusätzliche Webhooks sind nicht vorgesehen.
+
 ### 6. Pro-Check Severity-Override
 
 Für graduelles Ausrollen kann jeder Check pro Repository auf einen anderen Modus gestellt werden, ohne den globalen `strict`-Switch des Callers zu verändern. Schlüssel ist die OWASP-Designation, Wert ein Modus:

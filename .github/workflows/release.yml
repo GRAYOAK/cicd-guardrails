@@ -149,3 +149,68 @@ jobs:
           set -euo pipefail
           ASSETS=( "migrations/v${VERSION}.md" CHANGELOG.md )
           gh release upload "${TAG_NAME}" "${ASSETS[@]}" --clobber
+
+  # ── Optional: tell pinned demo repos to open a bump PR (GitHub App installation) ─
+  notify-demo-repos:
+    name: Dispatch demo consumer pin bump
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+      REPO_OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
+        with:
+          ref: ${{ env.TAG_NAME }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Mint installation token for consumer dispatches
+        id: dispatch-app-token
+        continue-on-error: true
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a  # v2.1.0
+        with:
+          app_id: ${{ secrets.GUARDRAILS_CONSUMER_DISPATCH_APP_ID }}
+          private_key: ${{ secrets.GUARDRAILS_CONSUMER_DISPATCH_APP_PRIVATE_KEY }}
+          installation_retrieval_mode: repository
+          installation_retrieval_payload: ${{ env.REPO_OWNER }}/cicd-demo-errors
+          repositories: '["${{ env.REPO_OWNER }}/cicd-demo-errors","${{ env.REPO_OWNER }}/cicd-demo-well"]'
+          permissions: '{"contents":"write"}'
+
+      - name: Skip demo dispatch when app credentials are not configured
+        if: ${{ steps.dispatch-app-token.outcome != 'success' }}
+        run: |
+          echo "Skipping demo-repo dispatch (mint GitHub App token step did not succeed)."
+          echo "Add secrets GUARDRAILS_CONSUMER_DISPATCH_APP_ID and GUARDRAILS_CONSUMER_DISPATCH_APP_PRIVATE_KEY"
+          echo "and install that app on cicd-demo-errors and cicd-demo-well with Contents: Read and write."
+
+      - name: Resolve tag commit and notify consumer repositories
+        if: ${{ steps.dispatch-app-token.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ steps.dispatch-app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          SHA="$(git rev-parse HEAD)"
+          if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Unexpected non-SHA HEAD at tag ${TAG_NAME}: ${SHA}" >&2
+            exit 1
+          fi
+          BODY="$(jq -nc --arg sha "$SHA" --arg tag "$TAG_NAME" \
+            '{event_type:"guardrails-release", client_payload:{sha:$sha, tag:$tag}}')"
+          any_ok=0
+          for repo in "${REPO_OWNER}/cicd-demo-errors" "${REPO_OWNER}/cicd-demo-well"; do
+            if gh api --method POST "repos/${repo}/dispatches" --input - <<<"$BODY"; then
+              echo "Dispatched guardrails-release to ${repo} (tag ${TAG_NAME}, sha ${SHA})."
+              any_ok=1
+            else
+              echo "::warning::Failed to dispatch to ${repo}; check app installation and repository names."
+            fi
+          done
+          if [ "$any_ok" -ne 1 ]; then
+            echo "::error::App token was minted but every dispatch attempt failed."
+            exit 1
+          fi
