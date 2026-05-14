@@ -18,7 +18,45 @@
     "validation_skip_paths": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Relative paths still discovered but excluded from manifest and lock policy validation for CICD-SEC-03."
+      "description": "Relative paths still discovered but excluded from manifest and lock policy validation for CICD-SEC-03 (including Python package_policy scans)."
+    },
+    "package_policy": {
+      "type": "object",
+      "description": "Optional overrides merged over the guardrails-shipped Python defaults for CICD-SEC-03.",
+      "additionalProperties": false,
+      "properties": {
+        "python": {
+          "type": "object",
+          "description": "Partial merge over scripts/config/package_policy.defaults.yml (per-key replacement for arrays and maps).",
+          "additionalProperties": false,
+          "properties": {
+            "triggers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Basenames that mark a directory as a Python project when present."
+            },
+            "satisfiers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Basenames; at least one must exist beside triggers when any trigger is present."
+            },
+            "allowed_trigger_combinations": {
+              "type": "array",
+              "description": "When more than one trigger basename is present, the set must match one combination exactly (order ignored).",
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            },
+            "hash_validators": {
+              "type": "object",
+              "description": "Maps satisfier basename to a built-in validator id (pip_requirements_txt_hashes, poetry_lock_hashes, uv_lock_hashes).",
+              "additionalProperties": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
     }
   }
 }

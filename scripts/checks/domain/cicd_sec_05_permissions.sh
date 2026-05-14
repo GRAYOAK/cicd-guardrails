@@ -23,6 +23,7 @@ if ! command -v yq >/dev/null 2>&1; then
   MISSING_RUNTIME=true
   fb_report "error" "Missing required runtime dependency yq." "" "" \
     "Install yq in the runner environment before running this check."
+  fb_add_coverage "Runtime prerequisite yq is missing; no workflow files were parsed for permissions."
   fb_summary
   exit "$(fb_exit_code false "$MISSING_RUNTIME")"
 fi
@@ -33,9 +34,22 @@ files=("$WORKFLOWS_DIR"/*.yml "$WORKFLOWS_DIR"/*.yaml)
 if [[ ${#files[@]} -eq 0 ]]; then
   fb_set_status "SKIPPED"
   fb_add_remediation "No workflow files found; no action required."
+  fb_add_coverage "No workflow files matched ${WORKFLOWS_DIR}/*.yml or *.yaml."
   fb_summary
   exit "$(fb_exit_code false false)"
 fi
+
+lim="$(fb_coverage_path_sample_limit)"
+cov_s="" cov_i=0
+for file in "${files[@]}"; do
+  cov_i=$((cov_i + 1))
+  [[ $cov_i -gt $lim ]] && break
+  rel="${file#"$PATH_ROOT/"}"
+  cov_s="${cov_s:+$cov_s; }${rel}"
+done
+cov_more=""
+[[ ${#files[@]} -gt $lim ]] && cov_more=" (+$((${#files[@]} - lim)) more)"
+fb_add_coverage "Workflow permissions: ${#files[@]} file(s); checking top-level permissions and per-job permissions blocks${cov_s:+; sample: }${cov_s}${cov_more}"
 
 for file in "${files[@]}"; do
   rel="${file#"$PATH_ROOT/"}"

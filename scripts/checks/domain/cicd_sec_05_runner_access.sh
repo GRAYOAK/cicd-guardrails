@@ -20,6 +20,7 @@ fb_add_searched "Generic self-hosted runner labels in workflow jobs"
 if ! wrs_require_yq; then
   fb_report "error" "Missing required runtime dependency yq." "" "" \
     "Install yq in the runner environment before running this check."
+  fb_add_coverage "Runtime prerequisite yq is missing; runner access scan did not enumerate workflows."
   fb_summary
   exit "$(fb_exit_code "$STRICT" true)"
 fi
@@ -32,9 +33,22 @@ done < <(wrs_list_workflow_files "$PATH_ROOT")
 if [[ ${#files[@]} -eq 0 ]]; then
   fb_set_status "SKIPPED"
   fb_add_remediation "No workflow files found; no action required."
+  fb_add_coverage "No workflow YAML discovered under the repository (runner access scan)."
   fb_summary
   exit "$(fb_exit_code "$STRICT" false)"
 fi
+
+lim="$(fb_coverage_path_sample_limit)"
+cov_s="" cov_i=0
+for file in "${files[@]}"; do
+  cov_i=$((cov_i + 1))
+  [[ $cov_i -gt $lim ]] && break
+  rel="${file#"$PATH_ROOT/"}"
+  cov_s="${cov_s:+$cov_s; }${rel}"
+done
+cov_more=""
+[[ ${#files[@]} -gt $lim ]] && cov_more=" (+$((${#files[@]} - lim)) more)"
+fb_add_coverage "Runner access: ${#files[@]} workflow file(s) scanned for generic self-hosted runner labels${cov_s:+; sample: }${cov_s}${cov_more}"
 
 for file in "${files[@]}"; do
   rel="${file#"$PATH_ROOT/"}"

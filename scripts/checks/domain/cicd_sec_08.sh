@@ -23,6 +23,7 @@ fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
 if [[ "$FB_MODE" == "off" ]]; then
   fb_set_status "SKIPPED"
   fb_add_remediation "Check disabled via configuration."
+  fb_add_coverage "Check disabled via configuration before any repository scan."
   fb_summary
   exit "$(fb_exit_code false false)"
 fi
@@ -41,9 +42,22 @@ done < <(fp_find_composite_actions)
 if [[ ${#files[@]} -eq 0 ]]; then
   fb_set_status "SKIPPED"
   fb_add_remediation "No composite action files under actions/; no action required."
+  fb_add_coverage "No composite action YAML matched under actions/ (repository-relative search)."
   fb_summary
   exit "$(fb_exit_code false false)"
 fi
+
+lim="$(fb_coverage_path_sample_limit)"
+cov_s="" cov_i=0
+for file in "${files[@]}"; do
+  cov_i=$((cov_i + 1))
+  [[ $cov_i -gt $lim ]] && break
+  rel="${file#"$PATH_ROOT/"}"
+  cov_s="${cov_s:+$cov_s; }${rel}"
+done
+cov_more=""
+[[ ${#files[@]} -gt $lim ]] && cov_more=" (+$((${#files[@]} - lim)) more)"
+fb_add_coverage "Composite action SHA pinning: ${#files[@]} file(s) under actions/${cov_s:+; sample: }${cov_s}${cov_more}"
 
 for file in "${files[@]}"; do
   action_pin_scan_file "$PATH_ROOT" "$file" "composite-action" || true

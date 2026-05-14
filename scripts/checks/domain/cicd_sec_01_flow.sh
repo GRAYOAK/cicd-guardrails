@@ -78,6 +78,10 @@ if ! protection="$(ghbp_read_protection "$REPO" "$branch")"; then
   exit "$(fb_exit_code "$STRICT" false)"
 fi
 
+fb_add_coverage "GitHub API: repository '${REPO}', default branch '${branch}', branch protection JSON retrieved."
+req_min="$(echo "$protection" | jq -r '.required_pull_request_reviews.required_approving_review_count // 0')"
+fb_add_coverage "Flow-control signals evaluated: required pull request reviews (minimum count ${req_min}), force-push policy, branch deletion policy."
+
 required_pr_raw="$(echo "$protection" | jq -r '.required_pull_request_reviews // empty')"
 if [[ -z "$required_pr_raw" ]]; then
   fb_report "error" "Pull request reviews are not required for '${branch}'." "" "" \

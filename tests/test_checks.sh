@@ -115,6 +115,7 @@ cp "$FIXTURES_DIR/bad-prt.yml" "$TMP/.github/workflows/ci.yml"
 run_check "$DOMAIN_DIR/cicd_sec_04.sh" "$TMP"
 assert_exit "detects pull_request_target usage" 1 "$LAST_EXIT"
 assert_output_contains "includes Searched block" "### Searched"
+assert_output_contains "includes Scan coverage block" "### Scan coverage"
 assert_output_contains "includes Found block" "### Found"
 assert_output_contains "includes Remediation block" "### Remediation"
 assert_output_contains "renders Mode line" "Mode: **fail**"
@@ -197,6 +198,7 @@ EOF
 echo '{}' > "$TMP/apps/docs/pnpm-lock.yaml"
 run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
 assert_exit "passes when nested npm manifests have lockfiles" 0 "$LAST_EXIT"
+assert_output_contains "includes Scan coverage for manifests" "### Scan coverage"
 teardown
 
 echo ""
@@ -209,8 +211,8 @@ name = "py-service"
 version = "0.1.0"
 EOF
 run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
-assert_exit "fails when pyproject has no poetry or uv lockfile" 1 "$LAST_EXIT"
-assert_output_contains "reports missing pyproject lockfile" "Missing poetry or uv lockfile next to pyproject.toml."
+assert_exit "fails when pyproject has no satisfier lockfile" 1 "$LAST_EXIT"
+assert_output_contains "reports missing python satisfier" "missing a required lock or hashed requirements"
 teardown
 
 echo ""
@@ -235,13 +237,35 @@ cat > "$TMP/services/py/pyproject.toml" <<'EOF'
 name = "py-service"
 version = "0.1.0"
 EOF
-echo '# lock' > "$TMP/services/py/poetry.lock"
-cat > "$TMP/services/py/requirements-dev.txt" <<'EOF'
-pytest==8.3.2
-ruff==0.5.7
+cat > "$TMP/services/py/poetry.lock" <<'EOF'
+[metadata]
+lock-version = "2.0"
+content-hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[[package]]
+name = "pytest"
+version = "8.3.2"
+files = [
+    {file = "pytest-8.3.2-py3-none-any.whl", hash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+]
 EOF
 run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
-assert_exit "passes for pyproject lockfile and pinned requirements" 0 "$LAST_EXIT"
+assert_exit "passes for pyproject with valid poetry.lock hashes" 0 "$LAST_EXIT"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh fails for ambiguous python triggers"
+setup
+mkdir -p "$TMP/services/py"
+cat > "$TMP/services/py/pyproject.toml" <<'EOF'
+[project]
+name = "py-service"
+version = "0.1.0"
+EOF
+echo "requests" > "$TMP/services/py/requirements.in"
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "fails for disallowed multi-trigger set" 1 "$LAST_EXIT"
+assert_output_contains "reports ambiguous python triggers" "Ambiguous Python dependency triggers"
 teardown
 
 echo ""
@@ -382,6 +406,7 @@ chmod +x "$TMP/bin/gh" "$TMP/bin/jq"
 PATH="$TMP/bin:$PATH" GITHUB_REPOSITORY="example/repo" run_check "$DOMAIN_DIR/cicd_sec_01_flow.sh"
 assert_exit "fails on weak flow controls" 1 "$LAST_EXIT"
 assert_output_contains "uses SEC-01 flow designation" "CICD-SEC-01-FLOW"
+assert_output_contains "includes Scan coverage block" "### Scan coverage"
 teardown
 
 echo ""
@@ -464,6 +489,7 @@ EOF
 run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results"
 assert_exit "returns exit 0 for summary output" 0 "$LAST_EXIT"
 assert_output_contains "prints executive snapshot" "Executive snapshot:"
+assert_output_contains "includes merged per-check scan coverage heading" "### Per-check scan coverage"
 assert_output_contains "groups Critical by Code and Settings" "##### Code"
 assert_output_contains "groups Critical by Code and Settings (settings bucket)" "##### Settings"
 assert_aggregate_critical_scope_order "Critical: Code bucket lists runner hardening before Settings lists flow check"

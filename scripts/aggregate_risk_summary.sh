@@ -244,6 +244,8 @@ render_severity_block() {
 }
 
 print_summary() {
+  local main_body="$1"
+  local per_check_coverage="${2:-}"
   local out
   out="## Risk summary and fix order\n\n"
   out+="- Context:\n"
@@ -260,10 +262,17 @@ print_summary() {
     out+="\n- Note: \`.guardrails.yml\` found but \`yq\` is missing; using conservative defaults.\n"
   fi
 
+  out+="\n### Per-check scan coverage\n"
+  if [[ -n "$per_check_coverage" ]]; then
+    out+="\n${per_check_coverage}\n"
+  else
+    out+="\n- No per-check scan coverage available (missing JSON artifacts or empty field).\n"
+  fi
+
   out+="\n### Prioritized fix order\n"
   out+="- **Code**: repository files and workflow YAML from the checkout.\n"
   out+="- **Settings**: branch protection and flow policy via GitHub API (admin-capable token may be required).\n\n"
-  out+="$1\n"
+  out+="${main_body}\n"
 
   printf "%b" "$out"
 }
@@ -275,9 +284,9 @@ done < <(find "$RESULTS_DIR" -type f -name "*.json" 2>/dev/null || true)
 
 if [[ ${#best_effort_results[@]} -eq 0 ]]; then
   msg="No check results found. Ensure each check job uploads JSON artifacts.\n"
-  print_summary "- No results available.\n\n${msg}"
+  print_summary "- No results available.\n\n${msg}" ""
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-    print_summary "- No results available.\n\n${msg}" >>"$GITHUB_STEP_SUMMARY"
+    print_summary "- No results available.\n\n${msg}" "" >>"$GITHUB_STEP_SUMMARY"
   fi
   exit 0
 fi
@@ -411,7 +420,28 @@ if [[ "$critical_count" -eq 0 && "$high_count" -eq 0 && "$medium_count" -eq 0 ]]
   list+="- No actionable findings based on current results.\n"
 fi
 
-final="$(print_summary "$list")"
+coverage_all=""
+while IFS= read -r jf; do
+  [[ -z "$jf" || ! -f "$jf" ]] && continue
+  cid="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["check_id"])' "$jf")"
+  jst="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$jf")"
+  cov="$(python3 -c 'import json,sys
+p=sys.argv[1]
+lim=int(sys.argv[2])
+d=json.load(open(p))
+c=d.get("scan_coverage_markdown") or ""
+if len(c) > lim:
+    c = c[:lim] + "\n\n…(truncated)"
+print(c)' "$jf" 1800)"
+  coverage_all+="- **${cid}** — status: \`${jst}\`"
+  if [[ -z "$cov" ]]; then
+    coverage_all+=" — _(no scan coverage in artifact)_\n\n"
+  else
+    coverage_all+="\n\n\`\`\`\n${cov}\n\`\`\`\n\n"
+  fi
+done < <(printf '%s\n' "${best_effort_results[@]}" | LC_ALL=C sort)
+
+final="$(print_summary "$list" "$coverage_all")"
 printf "%b\n" "$final"
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   printf "%b\n" "$final" >>"$GITHUB_STEP_SUMMARY"

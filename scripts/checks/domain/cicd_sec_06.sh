@@ -25,6 +25,16 @@ if [[ ! -x "./gitleaks" ]]; then
   exit "$(fb_exit_code false true)"
 fi
 
+shallow_note="unknown"
+if [[ -d "${PATH_ROOT}/.git" ]]; then
+  if [[ -f "${PATH_ROOT}/.git/shallow" ]]; then
+    shallow_note="yes (shallow clone)"
+  else
+    shallow_note="no"
+  fi
+fi
+fb_add_coverage "gitleaks detect on source path '${PATH_ROOT}' with redacted output; shallow clone metadata: ${shallow_note}."
+
 output_file="$(mktemp)"
 set +e
 ./gitleaks detect --source "$PATH_ROOT" --exit-code 1 --redact >"$output_file" 2>&1
