@@ -530,6 +530,20 @@ EOF
   assert_exit "summary completes with softened check" 0 "$LAST_EXIT"
   assert_output_contains "shows mode override note" "per-check override"
   teardown
+
+  echo ""
+  echo "▶ .guardrails.file-patterns.reference.yml mirrors package_policy.defaults.yml"
+  DEFAULTS_YML="${ROOT_DIR}/scripts/config/package_policy.defaults.yml"
+  REF_YML="${ROOT_DIR}/.guardrails.file-patterns.reference.yml"
+  # JSON-normalized compare ignores header comments in the flat defaults file.
+  if diff -q <(yq eval -oj '.' "$DEFAULTS_YML") <(yq eval -oj '.package_policy.python' "$REF_YML") >/dev/null 2>&1; then
+    echo "  ✅ reference package_policy.python matches shipped defaults"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ reference package_policy.python drifts from scripts/config/package_policy.defaults.yml"
+    diff -u <(yq eval -oj '.' "$DEFAULTS_YML") <(yq eval -oj '.package_policy.python' "$REF_YML") || true
+    FAIL=$((FAIL + 1))
+  fi
 fi
 
 echo ""

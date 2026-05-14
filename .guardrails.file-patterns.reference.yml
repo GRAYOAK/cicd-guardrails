@@ -1,5 +1,8 @@
-# Reference: built-in handler mapping (do not copy into consumer repos as a requirement).
-# Consumer repos may add `.guardrails.file-patterns.yml` for optional overlays only.
+# Human-readable documentation of effective file-scan defaults in this repository.
+# Runtime in consumer checkouts reads only `.guardrails.file-patterns.yml` when present;
+# built-in find excludes live in the guardrails scripts, and Python policy defaults ship
+# in the flat YAML next to this file (see package_policy.python below as a mirror).
+# Do not require copying this file into consumer repositories.
 #
 # policy_handler / artifact        implementation (relative to guardrails repo)
 # ---------------------------------------------------------------------------
@@ -21,6 +24,7 @@
 # composite-action / action.yml  scripts/lib/action_pin_audit.sh — action_pin_scan_file (ecosystem composite-action)
 
 version: 1
+# Mirror of built-in find excludes (consumer overlays add more; they do not replace these).
 global_excludes:
   - "*/.git/*"
   - "*/node_modules/*"
@@ -28,9 +32,32 @@ global_excludes:
   - "*/target/*"
 validation_skip_paths: []
 
-# Example overlay fragment (optional): merge keys under package_policy.python over
-# scripts/config/package_policy.defaults.yml shipped with guardrails.
-# package_policy:
-#   python:
-#     triggers:
-#       - pyproject.toml
+# Mirror of scripts/config/package_policy.defaults.yml (flat document == this key).
+# tests/test_checks.sh asserts they stay identical when yq is available.
+package_policy:
+  python:
+    triggers:
+      - pyproject.toml
+      - requirements.in
+      - requirements.txt
+      - requirements-dev.in
+      - requirements-dev.txt
+    satisfiers:
+      - requirements.txt
+      - requirements-dev.txt
+      - poetry.lock
+      - uv.lock
+    allowed_trigger_combinations:
+      - - requirements.in
+        - requirements.txt
+      - - requirements-dev.in
+        - requirements-dev.txt
+      - - pyproject.toml
+        - requirements.txt
+    hash_validators:
+      requirements.txt: pip_requirements_txt_hashes
+      requirements-dev.txt: pip_requirements_txt_hashes
+      poetry.lock: poetry_lock_hashes
+      uv.lock: uv_lock_hashes
+
+# Minimal overlay examples for consumer repos: see README (Dateiscan-Overlay).
