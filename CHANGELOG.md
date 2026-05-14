@@ -11,6 +11,14 @@ This file is maintained automatically by [release-please](https://github.com/goo
 For breaking-change migration steps targeted at automated consumers (including AI agents), see the
 companion file `migrations/v<X.Y.Z>.md` released alongside each version.
 
+## [0.2.2](https://github.com/Christopher-Rust/cicd-guardrails/compare/v0.2.1...v0.2.2) (2026-05-14)
+
+
+### Features
+
+* update default config ([4d3080d](https://github.com/Christopher-Rust/cicd-guardrails/commit/4d3080da11bab41f315a3f8488007db0e6d65c7e))
+* update default config ([#6](https://github.com/Christopher-Rust/cicd-guardrails/issues/6)) ([0709d6e](https://github.com/Christopher-Rust/cicd-guardrails/commit/0709d6efc74de2ba863c75726de38faf25e44e3b))
+
 ## [0.2.1](https://github.com/Christopher-Rust/cicd-guardrails/compare/v0.2.0...v0.2.1) (2026-05-14)
 
 
