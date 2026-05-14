@@ -11,6 +11,13 @@ This file is maintained automatically by [release-please](https://github.com/goo
 For breaking-change migration steps targeted at automated consumers (including AI agents), see the
 companion file `migrations/v<X.Y.Z>.md` released alongside each version.
 
+## [0.2.1](https://github.com/Christopher-Rust/cicd-guardrails/compare/v0.2.0...v0.2.1) (2026-05-14)
+
+
+### Features
+
+* add scan coverage to checks and risk summary ([7d5a7a9](https://github.com/Christopher-Rust/cicd-guardrails/commit/7d5a7a9554764a3422aed9ae142d603aa9bee2a4))
+
 ## [0.2.0](https://github.com/Christopher-Rust/cicd-guardrails/compare/v0.1.0...v0.2.0) (2026-05-12)
 
 
