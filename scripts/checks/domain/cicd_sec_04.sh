@@ -25,9 +25,22 @@ files=("$WORKFLOWS_DIR"/*.yml "$WORKFLOWS_DIR"/*.yaml)
 if [[ ${#files[@]} -eq 0 ]]; then
   fb_set_status "SKIPPED"
   fb_add_remediation "No workflow files found; no action required."
+  fb_add_coverage "No workflow files matched ${WORKFLOWS_DIR}/*.yml or *.yaml."
   fb_summary
   exit "$(fb_exit_code false false)"
 fi
+
+lim="$(fb_coverage_path_sample_limit)"
+cov_s="" cov_i=0
+for file in "${files[@]}"; do
+  cov_i=$((cov_i + 1))
+  [[ $cov_i -gt $lim ]] && break
+  rel="${file#"$PATH_ROOT/"}"
+  cov_s="${cov_s:+$cov_s; }${rel}"
+done
+cov_more=""
+[[ ${#files[@]} -gt $lim ]] && cov_more=" (+$((${#files[@]} - lim)) more)"
+fb_add_coverage "pull_request_target scan: ${#files[@]} workflow file(s)${cov_s:+; sample: }${cov_s}${cov_more}"
 
 for file in "${files[@]}"; do
   rel="${file#"$PATH_ROOT/"}"

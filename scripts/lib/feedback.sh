@@ -15,6 +15,39 @@ FB_OWASP_REF=""
 FB_MODE="fail"
 FB_FOUND_ROWS=()
 FB_FINDING_DETAIL_MARKDOWN=""
+FB_COVERAGE=""
+FB_SCAN_COVERAGE_MARKDOWN=""
+
+fb__coverage_level() {
+  case "${GUARDRAILS_COVERAGE:-compact}" in
+    off) echo "off" ;;
+    full) echo "full" ;;
+    *) echo "compact" ;;
+  esac
+}
+
+# Upper bound on relative paths listed per coverage bullet in compact mode.
+fb_coverage_path_sample_limit() {
+  case "$(fb__coverage_level)" in
+    full) echo "${GUARDRAILS_COVERAGE_FULL_MAX_PATHS:-2000}" ;;
+    *)
+      local m="${GUARDRAILS_COVERAGE_MAX_PATHS:-15}"
+      if [[ -z "$m" || ! "$m" =~ ^[0-9]+$ ]]; then
+        m=15
+      fi
+      echo "$m"
+      ;;
+  esac
+}
+
+fb_add_coverage() {
+  if [[ "$(fb__coverage_level)" == "off" ]]; then
+    return 0
+  fi
+  local text="$1"
+  [[ -z "$text" ]] && return 0
+  FB_COVERAGE+="- ${text}"$'\n'
+}
 
 fb__json_escape() {
   local s="${1:-}"
@@ -40,6 +73,8 @@ fb_write_result_json() {
   owasp="$(fb__json_escape "$FB_OWASP_REF")"
   local detail_json
   detail_json="$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1] or ""))' "${FB_FINDING_DETAIL_MARKDOWN}")"
+  local coverage_json
+  coverage_json="$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1] or ""))' "${FB_SCAN_COVERAGE_MARKDOWN:-}")"
 
   cat >"$out_path" <<EOF
 {
@@ -53,7 +88,8 @@ fb_write_result_json() {
     "notices": ${FB_NOTICE_COUNT}
   },
   "owasp_reference": "${owasp}",
-  "finding_detail_markdown": ${detail_json}
+  "finding_detail_markdown": ${detail_json},
+  "scan_coverage_markdown": ${coverage_json}
 }
 EOF
 }
@@ -72,6 +108,8 @@ fb_init() {
   FB_MODE="fail"
   FB_FOUND_ROWS=()
   FB_FINDING_DETAIL_MARKDOWN=""
+  FB_COVERAGE=""
+  FB_SCAN_COVERAGE_MARKDOWN=""
 }
 
 fb_add_searched() {
@@ -257,6 +295,22 @@ fb_summary() {
     remediation_block="- No action required."$'\n'
   fi
 
+  local cov_level
+  cov_level="$(fb__coverage_level)"
+  local coverage_block=""
+  FB_SCAN_COVERAGE_MARKDOWN=""
+  if [[ "$cov_level" != "off" ]]; then
+    if [[ -n "${FB_COVERAGE:-}" ]]; then
+      coverage_block="$FB_COVERAGE"
+      if [[ ${#coverage_block} -gt 10000 ]]; then
+        coverage_block="${coverage_block:0:10000}"$'\n\n…(truncated)'
+      fi
+    else
+      coverage_block="- No scan coverage details recorded."$'\n'
+    fi
+    FB_SCAN_COVERAGE_MARKDOWN="$coverage_block"
+  fi
+
   local report
   report="## ${FB_TITLE} (${FB_CHECK_ID})\n"
   report+="\n"
@@ -271,6 +325,11 @@ fb_summary() {
   report+="### Searched\n"
   report+="${searched_block}"
   report+="\n"
+  if [[ "$cov_level" != "off" ]]; then
+    report+="### Scan coverage\n"
+    report+="${coverage_block}"
+    report+="\n"
+  fi
   report+="### Found\n"
   report+="${found_block}"
   report+="\n"

@@ -31,6 +31,7 @@ Use this skill for changes in:
 - `CHANGELOG.md` (only when repository policy allows manual edits; otherwise rely on Conventional Commits and release-please)
 - `tests/test_checks.sh`
 - `README.md`
+- `.agents/skills/go-adjust-cicd-guardrails/reference-feedback-json.md` (JSON and scan-coverage contract for implementers)
 
 ## Invariants
 
@@ -41,8 +42,13 @@ Use this skill for changes in:
 - Proactively propose better alternative implementation concepts when they materially improve reliability, security, maintainability, or operability.
 - Keep per-check summary blocks consistent:
   - `Searched`
+  - `Scan coverage` (evidence of what ran; omit when coverage is turned off)
   - `Found`
   - `Remediation`
+- **Module design** (domain checks, shared libraries, and focused `scripts/lib` helpers):
+  - **Inputs and configuration**: expose operator-tunable behavior through documented environment variables, schema-driven config files, or small flags so new behavior is discoverable without reading implementation line-by-line.
+  - **Processing structure**: prefer phased or library-delegated flows (clear stages, shared helpers) so new ecosystems or policies can attach without rewriting the whole script when reasonable.
+  - **Observable output**: every run must make it obvious **what was evaluated** (paths, counts, API scope without secrets) and therefore what was **not** in scope or skipped; violations stay in **Found**, intent stays in **Searched**, evidence stays in **Scan coverage**.
 - Include check designation and OWASP reference in summaries.
 
 ## Naming convention (single source of truth)
@@ -78,9 +84,9 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
 3. Update shared behavior in `scripts/lib/feedback.sh` first when possible.
 4. Propagate to check scripts with minimal duplication.
 5. Ensure reusable workflow still uploads/downstreams artifacts expected by summary jobs.
-6. Update docs for any behavior change (`README.md`).
+6. Update docs for any behavior change (`README.md`); when per-check JSON fields or scan-coverage semantics change, update `reference-feedback-json.md` in the same change set (see accepted learnings).
 7. **Release and consumer hygiene** (always; see subsection below).
-8. Document the current software state in `workspace:Main`.
+8. Optionally record release-relevant state outside this repository when the team maintains such notes (not required for every change).
 9. Run tests and sanity checks:
    - `bash ./tests/test_checks.sh`
    - lints/diagnostics for edited files
@@ -102,8 +108,10 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
 ### Release, changelog, and migrations (mandatory)
 
 - **`CHANGELOG.md`**: this repository uses **release-please** (`release.yml` + `release-please-config.json`). Do **not** hand-edit the changelog when the file header states automation ownership. Ship user-visible history through **Conventional Commits** (`feat:`, `fix:`, `perf:`, …) so the release PR updates `CHANGELOG.md`.
+- **Commit types vs changelog**: `release-please-config.json` maps **`docs`** to the visible **Documentation** section and marks **`chore` as hidden**, so `docs(skill): …` appears in release notes under Documentation while `chore(skill): …` does not surface in the generated changelog body (still a valid conventional commit).
 - **Breaking changes** (`feat!:`, `fix!:`, or `BREAKING CHANGE:` footer): add at least one new snippet under `migrations/.unreleased/<short-slug>.md` copied from `migrations/TEMPLATE.md` so **migration-guard** passes and `release.yml` can assemble `migrations/vX.Y.Z.md` on cut.
 - **Non-breaking but consumer-visible** scan surface, job expectations, or hook `files` filters: still add an `.unreleased` snippet when operators or pinned callers must act; otherwise update `README.md` and demo repos clearly.
+- **Skill-only edits** (files under `.agents/skills/go-adjust-cicd-guardrails/` with no change to shipped scripts, workflows, or hooks): use a commit prefix such as `docs(skill):` or `chore(skill):` and skip new `migrations/.unreleased` snippets unless product consumers are genuinely impacted; keep release-please noise aligned with the real product surface.
 - **Demo repositories** (`cicd-demo-errors`, `cicd-demo-well`): keep them aligned with reusable-workflow behavior and local hook patterns whenever checks change what they exercise.
 - After a version exists, consumers should read `migrations/vX.Y.Z.md` from the GitHub Release assets together with `CHANGELOG.md`.
 
@@ -120,6 +128,8 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
   - per-check severity override pattern (`checks: { <DESIGNATION>: { mode: fail|warn|off } }`)
 - `playbooks.md`:
   - common change patterns and consumer wiring rules
+- `reference-feedback-json.md` (this folder):
+  - per-check JSON fields, scan coverage semantics, aggregation size expectations, backward-compatibility rules for parsers
 - `learnings.md`:
   - learning proposal protocol
   - accepted learnings
@@ -129,6 +139,7 @@ Load-on-demand triggers:
 - For scoring, context-weighting, or per-check override changes, read `reference-risk-model.md`.
 - For implementation path decisions, read `playbooks.md`.
 - For final chat output and skill updates based on learnings, read `learnings.md`.
+- For JSON result files, scan coverage markdown, or aggregator consumption of those fields, read `reference-feedback-json.md`.
 
 ## Test repositories
 
@@ -156,4 +167,4 @@ When behavior changes are user-facing, update both repositories and keep their w
 - **Changelog policy**: no forbidden manual edits to `CHANGELOG.md`; commits follow Conventional Commits so release-please can update the changelog.
 - **Migrations**: breaking PRs include new `migrations/.unreleased/*.md`; consumer-visible changes either add snippets or clearly update README and demo repos.
 - **Demo repositories** (`cicd-demo-errors`, `cicd-demo-well`) updated when check behaviour or fixtures change.
-- Current software state is documented in `workspace:Main`.
+- External release notes (for example in a team wiki) updated only when the change set explicitly requires communicating outside this repository.

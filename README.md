@@ -21,6 +21,12 @@ Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designa
 | `CICD-SEC-07-RUNNER-HARDENING` | `cicd-sec-07-runner-hardening` | `scripts/checks/domain/cicd_sec_07_runner_hardening.sh` | Code | `--privileged` Container und `sudo` in Workflows |
 | `CICD-SEC-08` | `cicd-sec-08` | `scripts/checks/domain/cicd_sec_08.sh` | Code | Composite Actions unter `actions/` — gleiche Pin-Regeln wie Workflows in SEC-03 |
 
+### Check-Ausgabe: Scan coverage
+
+Jeder Check schreibt neben **Searched** / **Found** / **Remediation** einen Abschnitt **Scan coverage** (englisch), der faktisch auflistet, was ausgewertet wurde (z. B. Dateianzahl, Stichproben von Pfaden, API-Kontext ohne Secrets). Über die Umgebungsvariable **`GUARDRAILS_COVERAGE`** steuerbar: `off` (kein Abschnitt), `compact` (Standard, begrenzte Pfadliste), `full` (mehr Pfade). Optional: **`GUARDRAILS_COVERAGE_MAX_PATHS`** überschreibt die Obergrenze für Pfad-Stichproben im `compact`-Modus.
+
+Die pro Job geschriebenen JSON-Ergebnisdateien enthalten zusätzlich **`scan_coverage_markdown`**. Der Job **Risk summary** (`scripts/aggregate_risk_summary.sh`) fügt daraus den Block **Per-check scan coverage** in die Markdown-Zusammenfassung ein. Im Modus **`full`** ist die Pfadliste weiterhin begrenzt (Standard 2000, über **`GUARDRAILS_COVERAGE_FULL_MAX_PATHS`** anpassbar), damit sehr große Monorepos stabil bleiben.
+
 > **Migrationshinweis (Breaking Change):** Job-IDs und `skip-checks`-Tokens bleiben `cicd-sec-*`. **Display-Namen** (Scope-Emoji 🧩/⚙️, `Code |` / `Settings |`, Themen-Emoji, Text) müssen in Branch Protection exakt gematcht werden. Nach einem Workflow-Pin-Update ggf. Required-Checks anpassen. Mapping siehe Abschnitt Branch Protection.
 
 ---

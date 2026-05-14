@@ -77,6 +77,9 @@ if ! protection="$(ghbp_read_protection "$REPO" "$branch")"; then
   exit "$(fb_exit_code "$STRICT" false)"
 fi
 
+fb_add_coverage "GitHub API: repository '${REPO}', default branch '${branch}', branch protection JSON retrieved."
+fb_add_coverage "Governance signals evaluated: stale review dismissal, code owner review requirement, admin bypass enforcement."
+
 dismiss_stale="$(echo "$protection" | jq -r '.required_pull_request_reviews.dismiss_stale_reviews // false')"
 if [[ "$dismiss_stale" != "true" ]]; then
   fb_report "warning" "Stale pull request approvals are not dismissed automatically." "" "" \

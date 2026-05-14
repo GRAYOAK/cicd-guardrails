@@ -115,6 +115,7 @@ cp "$FIXTURES_DIR/bad-prt.yml" "$TMP/.github/workflows/ci.yml"
 run_check "$DOMAIN_DIR/cicd_sec_04.sh" "$TMP"
 assert_exit "detects pull_request_target usage" 1 "$LAST_EXIT"
 assert_output_contains "includes Searched block" "### Searched"
+assert_output_contains "includes Scan coverage block" "### Scan coverage"
 assert_output_contains "includes Found block" "### Found"
 assert_output_contains "includes Remediation block" "### Remediation"
 assert_output_contains "renders Mode line" "Mode: **fail**"
@@ -197,6 +198,7 @@ EOF
 echo '{}' > "$TMP/apps/docs/pnpm-lock.yaml"
 run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
 assert_exit "passes when nested npm manifests have lockfiles" 0 "$LAST_EXIT"
+assert_output_contains "includes Scan coverage for manifests" "### Scan coverage"
 teardown
 
 echo ""
@@ -404,6 +406,7 @@ chmod +x "$TMP/bin/gh" "$TMP/bin/jq"
 PATH="$TMP/bin:$PATH" GITHUB_REPOSITORY="example/repo" run_check "$DOMAIN_DIR/cicd_sec_01_flow.sh"
 assert_exit "fails on weak flow controls" 1 "$LAST_EXIT"
 assert_output_contains "uses SEC-01 flow designation" "CICD-SEC-01-FLOW"
+assert_output_contains "includes Scan coverage block" "### Scan coverage"
 teardown
 
 echo ""
@@ -486,6 +489,7 @@ EOF
 run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results"
 assert_exit "returns exit 0 for summary output" 0 "$LAST_EXIT"
 assert_output_contains "prints executive snapshot" "Executive snapshot:"
+assert_output_contains "includes merged per-check scan coverage heading" "### Per-check scan coverage"
 assert_output_contains "groups Critical by Code and Settings" "##### Code"
 assert_output_contains "groups Critical by Code and Settings (settings bucket)" "##### Settings"
 assert_aggregate_critical_scope_order "Critical: Code bucket lists runner hardening before Settings lists flow check"

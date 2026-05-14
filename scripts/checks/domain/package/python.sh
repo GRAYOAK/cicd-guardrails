@@ -72,8 +72,16 @@ sec03__validate_pip_requirements_txt_hashes() {
   while IFS= read -r row; do
     [[ -z "$row" ]] && continue
     if [[ "$row" == MISSING_HASH\|* ]]; then
-      local pkg="${row#MISSING_HASH|}"
-      fb_report "error" "Python requirement is pinned but missing a pip --hash= line for '${pkg}'." "$rel" "" \
+      local rest pkg ln
+      rest="${row#MISSING_HASH|}"
+      if [[ "$rest" == *'|'* ]]; then
+        ln="${rest%%|*}"
+        pkg="${rest#*|}"
+      else
+        ln=""
+        pkg="$rest"
+      fi
+      fb_report "error" "Python requirement is pinned but missing a pip --hash= line for '${pkg}'." "$rel" "$ln" \
         "Regenerate with pip-compile --generate-hashes (or equivalent) and commit the lock output." "python"
     fi
   done < <(
@@ -84,16 +92,20 @@ path = sys.argv[1]
 lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
 
 
-def logical_lines(raw):
+def logical_blocks(raw):
     out = []
-    for line in raw:
+    for lineno, line in enumerate(raw, start=1):
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         s = line.rstrip("\n")
-        if out and out[-1].rstrip().endswith("\\"):
-            out[-1] = out[-1].rstrip().rstrip("\\").rstrip() + " " + s.lstrip()
+        if out and out[-1][1].rstrip().endswith("\\"):
+            prev_ln, prev_text = out[-1]
+            out[-1] = (
+                prev_ln,
+                prev_text.rstrip().rstrip("\\").rstrip() + " " + s.lstrip(),
+            )
             continue
-        out.append(s)
+        out.append((lineno, s))
     return out
 
 
@@ -117,7 +129,7 @@ def is_requirement(st):
     return bool(re.match(r"^[A-Za-z0-9_.+\[\]-]+(?:==|>=|<=|~=|!=|>|<|@)", t))
 
 
-for block in logical_lines(lines):
+for start_ln, block in logical_blocks(lines):
     b = block.strip()
     if not b or is_skipped(b):
         continue
@@ -125,7 +137,7 @@ for block in logical_lines(lines):
         continue
     if "--hash=" not in b and " --hash=" not in b:
         pkg = b.split()[0] if b.split() else b
-        print(f"MISSING_HASH|{pkg}")
+        print(f"MISSING_HASH|{start_ln}|{pkg}")
 PY
   )
 }
@@ -291,4 +303,30 @@ cicd_sec_03_run_python_package_policy() {
       sec03__run_hash_validator "$vid" "$path_root" "${dir}/${sf}" || true
     done
   done
+
+  local py_n="${#uniq_dirs[@]}"
+  local sat_desc=""
+  if ((${#sat_list[@]} > 0)); then
+    sat_desc="$(printf '%s, ' "${sat_list[@]}" | sed 's/, $//')"
+  else
+    sat_desc="(none configured)"
+  fi
+  local lim samp="" cnt=0
+  lim="$(fb_coverage_path_sample_limit)"
+  for dir in "${uniq_dirs[@]+"${uniq_dirs[@]}"}"; do
+    cnt=$((cnt + 1))
+    [[ $cnt -gt $lim ]] && break
+    local rd
+    rd="$(pkg_rel_path "$path_root" "$dir")"
+    samp="${samp:+$samp; }${rd}/"
+  done
+  local more=""
+  if [[ $py_n -gt $lim ]]; then
+    more=" (+$((py_n - lim)) more directories)"
+  fi
+  if [[ $py_n -eq 0 ]]; then
+    fb_add_coverage "Python package_policy: no directories with trigger files after applying repository validation rules."
+  else
+    fb_add_coverage "Python package_policy: ${py_n} director(ies) with triggers; satisfiers: ${sat_desc}${samp:+; sample: }${samp}${more}"
+  fi
 }
