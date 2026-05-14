@@ -24,11 +24,11 @@ fp_init() {
   if [[ -f "$FP_CONFIG_PATH" ]] && command -v yq >/dev/null 2>&1; then
     while IFS= read -r line; do
       [[ -n "$line" && "$line" != "null" ]] && FP_MERGED_EXCLUDES+=("$line")
-    done < <(yq -r '.global_excludes[]? // empty' "$FP_CONFIG_PATH" 2>/dev/null || true)
+    done < <(yq -r '(.global_excludes // [])[]' "$FP_CONFIG_PATH" 2>/dev/null || true)
 
     while IFS= read -r line; do
       [[ -n "$line" && "$line" != "null" ]] && FP_VALIDATION_SKIP_PATHS+=("$line")
-    done < <(yq -r '.validation_skip_paths[]? // empty' "$FP_CONFIG_PATH" 2>/dev/null || true)
+    done < <(yq -r '(.validation_skip_paths // [])[]' "$FP_CONFIG_PATH" 2>/dev/null || true)
   fi
 }
 

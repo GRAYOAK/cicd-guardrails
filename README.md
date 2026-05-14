@@ -12,7 +12,7 @@ Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designa
 | Designation | Job-ID | Skript | Scope | Was wird erkannt |
 |---|---|---|---|---|
 | `CICD-SEC-01-FLOW` | `cicd-sec-01-flow` | `scripts/checks/domain/cicd_sec_01_flow.sh` | Settings | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
-| `CICD-SEC-03` | `cicd-sec-03` | `scripts/checks/domain/cicd_sec_03.sh` | Code | Manifeste, Lockfiles, Workflow-`uses:`-SHA-Pins, Dockerfile-Basis-Images (digest); zentraler `find` im Skript |
+| `CICD-SEC-03` | `cicd-sec-03` | `scripts/checks/domain/cicd_sec_03.sh` | Code | Python: verzeichnisbasierte `package_policy` (Defaults im Repo + Overlay); andere Ökosysteme: Manifeste/Lockfiles; Workflow-`uses:`-SHA-Pins; Dockerfile-Digests; `find` im Skript |
 | `CICD-SEC-04` | `cicd-sec-04` | `scripts/checks/domain/cicd_sec_04.sh` | Code | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
 | `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Code | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
 | `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Settings | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
@@ -155,9 +155,12 @@ Fehlt die Datei, nutzt Guardrails konservative Defaults und schreibt das transpa
 Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03` leben in den Skripten; Consumer-Repos **müssen** keine Kopie pflegen. Optional kann das Ziel-Repo **zusätzliche** Einträge setzen:
 
 - `global_excludes` — weitere `find -not -path` Muster (additiv zu den Defaults)
-- `validation_skip_paths` — relative Pfade, die zwar gefunden, aber **ohne** Manifest-/Lock-Policy geprüft werden
+- `validation_skip_paths` — relative Pfade, die zwar gefunden, aber **ohne** Manifest-/Lock-Policy geprüft werden (sinnvoll für reine Tooling-`pyproject.toml`-Verzeichnisse)
+- `package_policy.python` — partielles Überschreiben der im Guardrails-Repo mitgelieferten Python-Standardpolicy (`scripts/config/package_policy.defaults.yml`): `triggers` (welche Dateinamen ein Verzeichnis als Python-Projekt markieren), `satisfiers` (OR-Liste erlaubter Nachweis-Dateien nebenan), `allowed_trigger_combinations` (exakte erlaubte Trigger-Mengen bei mehr als einem Trigger gleichzeitig), `hash_validators` (Zuordnung Satisfier-Dateiname zu eingebautem Validator)
 
-Schema: [`.guardrails.file-patterns.schema.json`](.guardrails.file-patterns.schema.json). Handler- und Dateizuordnung (Referenz, nicht zum Kopieren ins Zielrepo erforderlich): [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml). Einlesen der Overlay-Datei erfolgt mit `yq`; fehlt `yq` oder die Datei, bleiben die eingebauten Defaults aktiv.
+Merge-Verhalten: Ohne `yq` wird die mitgelieferte Default-Datei unverändert verwendet. Mit `yq` werden `package_policy.python`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
+
+Schema: [`.guardrails.file-patterns.schema.json`](.guardrails.file-patterns.schema.json). Handler- und Dateizuordnung (Referenz, nicht zum Kopieren ins Zielrepo erforderlich): [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml). Python-Defaults (Referenz, im Guardrails-Repo versioniert): [`scripts/config/package_policy.defaults.yml`](scripts/config/package_policy.defaults.yml). Einlesen der Overlay-Datei erfolgt mit `yq`; fehlt `yq` oder die Datei, bleiben die eingebauten Defaults aktiv (Python-Policy aus der Default-Datei, andere Ausschlüsse wie bisher).
 
 **Upgrades für Consumer:** siehe [`migrations/README.md`](migrations/README.md). Während der Entwicklung Snippets unter [`migrations/.unreleased/`](migrations/.unreleased/) ergänzen; beim Release werden sie zu `migrations/vX.Y.Z.md` zusammengeführt. Die [`CHANGELOG.md`](CHANGELOG.md) wird durch **release-please** aus **Conventional Commits** gepflegt — nicht manuell umschreiben, wenn die Datei das so vorsieht; sichtbare Änderungen über Commit-Messages (`feat:`, `fix:`, `feat!:` usw.) einspielen.
 
@@ -226,11 +229,13 @@ cicd-guardrails/
 │       └── self-test.yml                 # Dogfooding: dieses Repo prüft sich selbst
 │
 ├── scripts/
+│   ├── config/
+│   │   └── package_policy.defaults.yml   # Python CICD-SEC-03 Standardpolicy (Flat-YAML)
 │   ├── checks/
 │   │   ├── domain/                       # Fachliche Startpunkte (cicd_sec_*)
 │   │   │   ├── cicd_sec_01_flow.sh
 │   │   │   ├── cicd_sec_03.sh
-│   │   │   ├── package/                  # Sprachmodule fuer CICD-SEC-03
+│   │   │   ├── package/                  # Sprachmodule fuer CICD-SEC-03 (JS/Go/Rust/Ruby/PHP; Python Logik)
 │   │   │   │   ├── js_ts.sh
 │   │   │   │   ├── python.sh
 │   │   │   │   ├── go.sh
@@ -251,6 +256,8 @@ cicd-guardrails/
 │   └── lib/
 │       ├── config.sh                     # .guardrails.yml Reader (Context + Checks)
 │       ├── feedback.sh                   # Reporting-Helper, Mode-Override
+│       ├── file_patterns.sh              # find-Helfer, Overlay global_excludes / validation_skip_paths
+│       ├── package_policy.sh             # Python package_policy Merge (Defaults + Overlay)
 │       └── package_scan.sh               # Shared helper functions for package checks
 │
 └── tests/

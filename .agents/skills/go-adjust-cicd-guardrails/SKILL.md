@@ -15,6 +15,8 @@ Use this skill for changes in:
 - `scripts/lib/feedback.sh`
 - `scripts/lib/config.sh`
 - `scripts/lib/file_patterns.sh`
+- `scripts/lib/package_policy.sh`
+- `scripts/config/package_policy.defaults.yml` (shipped Python CICD-SEC-03 defaults merged with overlay `package_policy.python`)
 - `scripts/lib/action_pin_audit.sh`
 - `scripts/lib/dockerfile_pin_audit.sh`
 - `scripts/aggregate_risk_summary.sh`

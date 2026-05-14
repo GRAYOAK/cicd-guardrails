@@ -1,0 +1,27 @@
+# Shipped with cicd-guardrails: default CICD-SEC-03 Python package policy (flat document).
+# Merged with .guardrails.file-patterns.yml key package_policy.python when yq is available;
+# without yq this file is copied verbatim as the effective policy.
+
+triggers:
+  - pyproject.toml
+  - requirements.in
+  - requirements.txt
+  - requirements-dev.in
+  - requirements-dev.txt
+satisfiers:
+  - requirements.txt
+  - requirements-dev.txt
+  - poetry.lock
+  - uv.lock
+allowed_trigger_combinations:
+  - - requirements.in
+    - requirements.txt
+  - - requirements-dev.in
+    - requirements-dev.txt
+  - - pyproject.toml
+    - requirements.txt
+hash_validators:
+  requirements.txt: pip_requirements_txt_hashes
+  requirements-dev.txt: pip_requirements_txt_hashes
+  poetry.lock: poetry_lock_hashes
+  uv.lock: uv_lock_hashes

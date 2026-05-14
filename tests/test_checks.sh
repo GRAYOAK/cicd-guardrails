@@ -209,8 +209,8 @@ name = "py-service"
 version = "0.1.0"
 EOF
 run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
-assert_exit "fails when pyproject has no poetry or uv lockfile" 1 "$LAST_EXIT"
-assert_output_contains "reports missing pyproject lockfile" "Missing poetry or uv lockfile next to pyproject.toml."
+assert_exit "fails when pyproject has no satisfier lockfile" 1 "$LAST_EXIT"
+assert_output_contains "reports missing python satisfier" "missing a required lock or hashed requirements"
 teardown
 
 echo ""
@@ -235,13 +235,35 @@ cat > "$TMP/services/py/pyproject.toml" <<'EOF'
 name = "py-service"
 version = "0.1.0"
 EOF
-echo '# lock' > "$TMP/services/py/poetry.lock"
-cat > "$TMP/services/py/requirements-dev.txt" <<'EOF'
-pytest==8.3.2
-ruff==0.5.7
+cat > "$TMP/services/py/poetry.lock" <<'EOF'
+[metadata]
+lock-version = "2.0"
+content-hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[[package]]
+name = "pytest"
+version = "8.3.2"
+files = [
+    {file = "pytest-8.3.2-py3-none-any.whl", hash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+]
 EOF
 run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
-assert_exit "passes for pyproject lockfile and pinned requirements" 0 "$LAST_EXIT"
+assert_exit "passes for pyproject with valid poetry.lock hashes" 0 "$LAST_EXIT"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh fails for ambiguous python triggers"
+setup
+mkdir -p "$TMP/services/py"
+cat > "$TMP/services/py/pyproject.toml" <<'EOF'
+[project]
+name = "py-service"
+version = "0.1.0"
+EOF
+echo "requests" > "$TMP/services/py/requirements.in"
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "fails for disallowed multi-trigger set" 1 "$LAST_EXIT"
+assert_output_contains "reports ambiguous python triggers" "Ambiguous Python dependency triggers"
 teardown
 
 echo ""

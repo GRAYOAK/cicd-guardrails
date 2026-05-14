@@ -13,6 +13,8 @@ source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
 source "${ROOT_SCRIPTS_DIR}/lib/package_scan.sh"
 # shellcheck source=scripts/lib/file_patterns.sh
 source "${ROOT_SCRIPTS_DIR}/lib/file_patterns.sh"
+# shellcheck source=scripts/lib/package_policy.sh
+source "${ROOT_SCRIPTS_DIR}/lib/package_policy.sh"
 # shellcheck source=scripts/lib/action_pin_audit.sh
 source "${ROOT_SCRIPTS_DIR}/lib/action_pin_audit.sh"
 # shellcheck source=scripts/lib/dockerfile_pin_audit.sh
@@ -49,9 +51,11 @@ if [[ "$FB_MODE" == "off" ]]; then
 fi
 
 fp_init "$PATH_ROOT"
+pp_init "$PATH_ROOT"
+trap pp_cleanup EXIT
 
-fb_add_searched "Package manifests and Python requirements with lock or pin policy"
-fb_add_searched "Lockfiles for integrity checks (npm, pnpm, yarn, poetry, uv, go, Cargo, Ruby, PHP)"
+fb_add_searched "Python package_policy directories (triggers, satisfiers, hashes)"
+fb_add_searched "Package manifests and lockfiles (npm, pnpm, yarn, go, Cargo, Ruby, PHP)"
 fb_add_searched "GitHub workflow YAML files for third-party action SHA pins"
 fb_add_searched "Dockerfiles for digest-pinned base images"
 
@@ -69,10 +73,12 @@ sec03_for_each_file() {
   done
 }
 
+sec03_phase_python_package_policy() {
+  cicd_sec_03_run_python_package_policy "$PATH_ROOT" || true
+}
+
 sec03_phase_manifests_and_requirements() {
   sec03_for_each_file cicd_sec_03_audit_js_ts_package_json < <(fp_find_with_names "$PATH_ROOT" "package.json")
-  sec03_for_each_file cicd_sec_03_audit_python_pyproject < <(fp_find_with_names "$PATH_ROOT" "pyproject.toml")
-  sec03_for_each_file cicd_sec_03_audit_python_requirements < <(fp_find_with_names "$PATH_ROOT" "requirements*.txt")
   sec03_for_each_file cicd_sec_03_audit_go_mod < <(fp_find_with_names "$PATH_ROOT" "go.mod")
   sec03_for_each_file cicd_sec_03_audit_rust_cargo_toml < <(fp_find_with_names "$PATH_ROOT" "Cargo.toml")
   sec03_for_each_file cicd_sec_03_audit_ruby_gemfile < <(fp_find_with_names "$PATH_ROOT" "Gemfile")
@@ -83,8 +89,6 @@ sec03_phase_lockfiles() {
   sec03_for_each_file cicd_sec_03_audit_js_ts_lock_package_lock < <(fp_find_with_names "$PATH_ROOT" "package-lock.json")
   sec03_for_each_file cicd_sec_03_audit_js_ts_lock_yarn < <(fp_find_with_names "$PATH_ROOT" "yarn.lock")
   sec03_for_each_file cicd_sec_03_audit_js_ts_lock_pnpm < <(fp_find_with_names "$PATH_ROOT" "pnpm-lock.yaml")
-  sec03_for_each_file cicd_sec_03_audit_python_lock_poetry < <(fp_find_with_names "$PATH_ROOT" "poetry.lock")
-  sec03_for_each_file cicd_sec_03_audit_python_lock_uv < <(fp_find_with_names "$PATH_ROOT" "uv.lock")
   sec03_for_each_file cicd_sec_03_audit_go_sum < <(fp_find_with_names "$PATH_ROOT" "go.sum")
   sec03_for_each_file cicd_sec_03_audit_rust_cargo_lock < <(fp_find_with_names "$PATH_ROOT" "Cargo.lock")
   sec03_for_each_file cicd_sec_03_audit_ruby_gemfile_lock < <(fp_find_with_names "$PATH_ROOT" "Gemfile.lock")
@@ -113,6 +117,7 @@ sec03_phase_workflows_and_dockerfiles() {
   done < <(fp_find_dockerfiles)
 }
 
+sec03_phase_python_package_policy
 sec03_phase_manifests_and_requirements
 sec03_phase_lockfiles
 sec03_phase_workflows_and_dockerfiles

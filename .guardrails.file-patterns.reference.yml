@@ -7,10 +7,7 @@
 # js_ts / package-lock.json        same — cicd_sec_03_audit_js_ts_lock_package_lock
 # js_ts / yarn.lock                same — cicd_sec_03_audit_js_ts_lock_yarn
 # js_ts / pnpm-lock.yaml           same — cicd_sec_03_audit_js_ts_lock_pnpm
-# python / pyproject.toml          scripts/checks/domain/package/python.sh — cicd_sec_03_audit_python_pyproject
-# python / requirements*.txt       same — cicd_sec_03_audit_python_requirements
-# python / poetry.lock             same — cicd_sec_03_audit_python_lock_poetry
-# python / uv.lock                 same — cicd_sec_03_audit_python_lock_uv
+# python / (directory policy)      scripts/config/package_policy.defaults.yml + scripts/lib/package_policy.sh + scripts/checks/domain/package/python.sh — cicd_sec_03_run_python_package_policy
 # go / go.mod                      scripts/checks/domain/package/go.sh — cicd_sec_03_audit_go_mod
 # go / go.sum                      same — cicd_sec_03_audit_go_sum
 # rust / Cargo.toml                scripts/checks/domain/package/rust.sh — cicd_sec_03_audit_rust_cargo_toml
@@ -30,3 +27,10 @@ global_excludes:
   - "*/.venv/*"
   - "*/target/*"
 validation_skip_paths: []
+
+# Example overlay fragment (optional): merge keys under package_policy.python over
+# scripts/config/package_policy.defaults.yml shipped with guardrails.
+# package_policy:
+#   python:
+#     triggers:
+#       - pyproject.toml
