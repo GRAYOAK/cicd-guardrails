@@ -16,6 +16,8 @@ Downstream jobs (for example risk aggregation) read one JSON file per check. The
 
 When coverage is enabled, the printed report uses this order: title and counts, **Searched** (intent), **Scan coverage** (evidence), **Found** (violations only), **Remediation**.
 
+The printed **Remediation** section deduplicates identical bullet text (first-seen order) and adds a short intro paragraph; per-finding remediation strings are still collected during the run but are not written to the JSON artifact (which has no separate remediation field).
+
 ## Environment knobs (operator-facing)
 
 - Coverage verbosity for the markdown block: one variable with values **off**, **compact** (default), or **full**. Path samples use a numeric cap in compact mode; full mode uses a higher cap so large monorepos stay bounded.

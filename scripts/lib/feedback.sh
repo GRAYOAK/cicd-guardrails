@@ -177,6 +177,32 @@ fb_report() {
   fb_add_remediation "$remediation"
 }
 
+# Deduplicate remediation bullets (first-seen order) and add a short intro for the summary.
+fb__remediation_for_summary() {
+  local raw="${1:-}"
+  if [[ -z "$raw" ]]; then
+    printf '%s' ""
+    return 0
+  fi
+  local bullets
+  bullets="$(printf '%s' "$raw" | awk '
+    /^- / {
+      line = substr($0, 3)
+      if (!(line in seen)) {
+        seen[line] = 1
+        print "- " line
+      }
+    }
+  ')"
+  if [[ -z "$bullets" ]]; then
+    printf '%s' ""
+    return 0
+  fi
+  printf '%s\n\n%s' \
+    "Apply the items below as needed for the findings above; each bullet is listed once even when many findings share the same fix." \
+    "$bullets"
+}
+
 fb__render_grouped_found() {
   if [[ ${#FB_FOUND_ROWS[@]} -eq 0 ]]; then
     printf '%s' ""
@@ -290,6 +316,9 @@ fb_summary() {
   fi
   if [[ -z "$found_block" ]]; then
     found_block="- No findings."$'\n'
+  fi
+  if [[ -n "$remediation_block" ]]; then
+    remediation_block="$(fb__remediation_for_summary "$remediation_block")"
   fi
   if [[ -z "$remediation_block" ]]; then
     remediation_block="- No action required."$'\n'

@@ -226,6 +226,33 @@ EOF
 run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
 assert_exit "fails for non pinned requirements entry" 1 "$LAST_EXIT"
 assert_output_contains "reports unpinned dependency name" "Unpinned python dependency 'requests'."
+assert_output_contains "reports unpinned dependency with line number" "requirements.txt:1"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03.sh deduplicates remediation bullets"
+setup
+mkdir -p "$TMP/services/py"
+cat > "$TMP/services/py/requirements.txt" <<'EOF'
+requests
+flask
+EOF
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "fails for multiple unpinned requirements" 1 "$LAST_EXIT"
+remediation_count="$(printf '%s' "$LAST_OUTPUT" | awk '
+  /^### Remediation$/ { in_rem=1; next }
+  in_rem && /^### / { in_rem=0 }
+  in_rem && /^## / { in_rem=0 }
+  in_rem && /^- Pin each dependency with exact ==/ { c++ }
+  END { print c+0 }
+')"
+if [[ "$remediation_count" -eq 1 ]]; then
+  echo "  ✅ remediation lists shared fix once"
+  PASS=$((PASS + 1))
+else
+  echo "  ❌ remediation lists shared fix once (expected 1 bullet, got $remediation_count)"
+  FAIL=$((FAIL + 1))
+fi
 teardown
 
 echo ""

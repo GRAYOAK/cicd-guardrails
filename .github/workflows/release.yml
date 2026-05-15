@@ -148,6 +148,15 @@ jobs:
         run: |
           set -euo pipefail
           ASSETS=( "migrations/v${VERSION}.md" CHANGELOG.md )
+          IMMUTABLE="$(
+            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG_NAME}" \
+              --jq '.immutable // false' 2>/dev/null || echo false
+          )"
+          if [ "$IMMUTABLE" = "true" ]; then
+            echo "::notice::Release is immutable; cannot add or replace assets. Skipping upload."
+            echo "Migration notes and changelog are still on the default branch (see migrations/ and CHANGELOG.md)."
+            exit 0
+          fi
           gh release upload "${TAG_NAME}" "${ASSETS[@]}" --clobber
 
   # ── Optional: tell pinned demo repos to open a bump PR (GitHub App installation) ─

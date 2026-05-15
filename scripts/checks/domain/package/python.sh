@@ -60,18 +60,16 @@ sec03__validate_pip_requirements_txt_hashes() {
   local abs="$2"
   local rel
   rel="$(pkg_rel_path "$path_root" "$abs")"
-  local unpinned
-  unpinned="$(grep -vE '^\s*(#|-r |--|-i |$)' "$abs" | grep -v '==' || true)"
-  if [[ -n "$unpinned" ]]; then
-    while IFS= read -r line; do
-      [[ -z "$line" ]] && continue
-      fb_report "error" "Unpinned python dependency '${line}'." "$rel" "" \
-        "Pin each dependency with exact == version and pip --hash lines (pip-compile --generate-hashes)." "python"
-    done <<<"$unpinned"
-  fi
   while IFS= read -r row; do
     [[ -z "$row" ]] && continue
-    if [[ "$row" == MISSING_HASH\|* ]]; then
+    if [[ "$row" == UNPINNED\|* ]]; then
+      local rest ln content
+      rest="${row#UNPINNED|}"
+      ln="${rest%%|*}"
+      content="${rest#*|}"
+      fb_report "error" "Unpinned python dependency '${content}'." "$rel" "$ln" \
+        "Pin each dependency with exact == version and pip --hash lines (pip-compile --generate-hashes)." "python"
+    elif [[ "$row" == MISSING_HASH\|* ]]; then
       local rest pkg ln
       rest="${row#MISSING_HASH|}"
       if [[ "$rest" == *'|'* ]]; then
@@ -89,7 +87,19 @@ sec03__validate_pip_requirements_txt_hashes() {
 import re, sys
 
 path = sys.argv[1]
-lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
+raw_lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
+drop_physical = re.compile(r"^\s*(#|-r |--|-i |)$")
+events = []
+
+for phys_ln, line in enumerate(raw_lines, start=1):
+    if drop_physical.match(line):
+        continue
+    if "==" in line:
+        continue
+    s = line.strip()
+    if not s:
+        continue
+    events.append((phys_ln, 0, "UNPINNED", s))
 
 
 def logical_blocks(raw):
@@ -129,7 +139,7 @@ def is_requirement(st):
     return bool(re.match(r"^[A-Za-z0-9_.+\[\]-]+(?:==|>=|<=|~=|!=|>|<|@)", t))
 
 
-for start_ln, block in logical_blocks(lines):
+for start_ln, block in logical_blocks(raw_lines):
     b = block.strip()
     if not b or is_skipped(b):
         continue
@@ -137,7 +147,13 @@ for start_ln, block in logical_blocks(lines):
         continue
     if "--hash=" not in b and " --hash=" not in b:
         pkg = b.split()[0] if b.split() else b
-        print(f"MISSING_HASH|{start_ln}|{pkg}")
+        events.append((start_ln, 1, "MISSING_HASH", pkg))
+
+for ln, _prio, kind, payload in sorted(events, key=lambda x: (x[0], x[1])):
+    if kind == "UNPINNED":
+        print(f"UNPINNED|{ln}|{payload}")
+    else:
+        print(f"MISSING_HASH|{ln}|{payload}")
 PY
   )
 }
