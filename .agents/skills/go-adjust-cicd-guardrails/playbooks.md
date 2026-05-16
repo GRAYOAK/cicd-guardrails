@@ -14,7 +14,7 @@
    cfg_init "$PATH_ROOT"
    fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
    ```
-3. Add a job to `full-scan.yml` with the matching kebab-case ID (`cicd-sec-<nr>[-aspect]`) and a designation-led display name. Include the target checkout, the script invocation, and the artifact upload.
+3. Add a job to `full-scan.yml` with the matching kebab-case ID (`cicd-sec-<nr>[-aspect]`) and a designation-led display name. Include the `scan_repo` checkout, the script invocation, and the artifact upload.
 4. Add the new job to the `summarize` job's `needs:` list and to the `skip-checks` description so consumers can disable it.
 5. Register the new designation as a property under `checks` in `.guardrails.schema.json` so IDE validation accepts overrides for it.
 6. Extend `aggregate_risk_summary.sh` (`base_score`, `context_multiplier_pct`, `derive_*`) with deterministic patterns; place specific designations before generic catch-alls.

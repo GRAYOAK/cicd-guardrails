@@ -35,7 +35,7 @@ Antwortformat: 1=ja, 2=nein, 3=ja
 - Prefer passing GitHub App credentials into the reusable workflow and mint short-lived tokens inside relevant called jobs to avoid cross-job secret output warnings and fragile token propagation.
 - When fixing workflow runtime deprecations, update producer and consumer wiring together so compatibility, secret contracts, and documentation remain aligned.
 - For branch-policy checks, keep deterministic token precedence: explicit admin token first, then in-job GitHub App token, then repository default token.
-- For domain checks that read repository-level policy context, always checkout the caller repository to a stable `target` path in the reusable workflow job and pass that path into the check script.
+- For domain checks that read repository-level policy context, always checkout the caller repository to a stable `scan_repo` path in the reusable workflow job and pass that path into the check script. Never use `target` as the checkout folder: it collides with the Rust artifact exclude `*/target/*` and silently skips all repository files.
 - In risk aggregation pattern matching, place specific designation clauses before generic family catch-alls so scoring and explanation logic remain deterministic as new sub-designations are added.
 - Validate remote-derived workflow SHAs with a strict 40-character hexadecimal check before automation rewrites pinned workflow references.
 - Keep positive and negative fixture repositories pinned to the same reusable-workflow revision to detect regressions and false positives consistently.

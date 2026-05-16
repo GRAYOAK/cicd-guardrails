@@ -118,7 +118,7 @@ jobs:
       - name: Checkout caller repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          path: target
+          path: scan_repo
 
       - name: Checkout guardrails scripts
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
@@ -142,7 +142,7 @@ jobs:
           sudo mv yq /usr/local/bin/yq
 
       - name: Generate risk summary
-        run: bash guardrails/scripts/aggregate_risk_summary.sh target guardrails-results
+        run: bash guardrails/scripts/aggregate_risk_summary.sh scan_repo guardrails-results
 
   # ── CICD-SEC-04: pull_request_target ──────────────────────────────────────
   cicd-sec-04:
@@ -156,7 +156,7 @@ jobs:
       - name: Checkout caller repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          path: target
+          path: scan_repo
 
       - name: Checkout guardrails scripts
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
@@ -165,7 +165,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_04.sh target
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_04.sh scan_repo
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -190,7 +190,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          path: target
+          path: scan_repo
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
@@ -198,7 +198,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_08.sh target
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_08.sh scan_repo
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -221,7 +221,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          path: target
+          path: scan_repo
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
@@ -229,7 +229,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_05_permissions.sh target
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_05_permissions.sh scan_repo
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -252,7 +252,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          path: target
+          path: scan_repo
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
@@ -260,7 +260,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_03.sh target ${{ inputs.strict && '--strict' || '' }}
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_03.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -284,7 +284,7 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
           fetch-depth: 0
-          path: target
+          path: scan_repo
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
@@ -302,7 +302,7 @@ jobs:
           tar xzf gitleaks.tar.gz gitleaks
 
       - name: Scan for secrets
-        run: bash guardrails/scripts/checks/domain/cicd_sec_06.sh target
+        run: bash guardrails/scripts/checks/domain/cicd_sec_06.sh scan_repo
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -325,7 +325,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          path: target
+          path: scan_repo
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
@@ -333,7 +333,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_01_flow.sh target ${{ inputs.strict && '--strict' || '' }}
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_01_flow.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
           GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
           GUARDRAILS_RESULT_DIR: guardrails-results
@@ -357,7 +357,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          path: target
+          path: scan_repo
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
@@ -365,7 +365,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_05_branch.sh target ${{ inputs.strict && '--strict' || '' }}
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_05_branch.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
           GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
           GUARDRAILS_RESULT_DIR: guardrails-results
@@ -389,7 +389,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          path: target
+          path: scan_repo
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
@@ -397,7 +397,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_05_runner_access.sh target ${{ inputs.strict && '--strict' || '' }}
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_05_runner_access.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -420,7 +420,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          path: target
+          path: scan_repo
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
@@ -428,7 +428,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_07_runner_hardening.sh target ${{ inputs.strict && '--strict' || '' }}
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_07_runner_hardening.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 

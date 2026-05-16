@@ -305,6 +305,21 @@ assert_output_contains "reports ambiguous python triggers" "Ambiguous Python dep
 teardown
 
 echo ""
+echo "▶ cicd_sec_03.sh discovers files under scan_repo checkout path (CI layout)"
+setup
+mkdir -p "$TMP/scan_repo/.github/workflows"
+cat > "$TMP/scan_repo/requirements.txt" <<'EOF'
+fastapi
+EOF
+cp "$FIXTURES_DIR/good-workflow.yml" "$TMP/scan_repo/.github/workflows/ci.yml"
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP/scan_repo"
+assert_exit "fails for unpinned requirements under scan_repo path" 1 "$LAST_EXIT"
+assert_output_contains "finds python package_policy under scan_repo path" "Python package_policy: 1 director"
+assert_output_contains "evaluates workflow under scan_repo path" "Workflow YAML for third-party action pins: 1 files"
+assert_output_contains "reports unpinned python dependency under scan_repo path" "Unpinned python dependency"
+teardown
+
+echo ""
 echo "▶ cicd_sec_03.sh fails for missing go lockfile"
 setup
 mkdir -p "$TMP/services/go-api"
@@ -515,14 +530,14 @@ fi
 echo ""
 echo "▶ aggregate_risk_summary.sh"
 setup
-mkdir -p "$TMP/target" "$TMP/results"
+mkdir -p "$TMP/scan_repo" "$TMP/results"
 cat > "$TMP/results/CICD-SEC-01-FLOW.json" <<'EOF'
 {"check_id":"CICD-SEC-01-FLOW","title":"Flow control policy check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-01-Insufficient-Flow-Control-Mechanisms/"}
 EOF
 cat > "$TMP/results/CICD-SEC-07-RUNNER-HARDENING.json" <<'EOF'
 {"check_id":"CICD-SEC-07-RUNNER-HARDENING","title":"Runner hardening check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-07-Insecure-System-Configuration/"}
 EOF
-run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results"
+run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/scan_repo" "$TMP/results"
 assert_exit "returns exit 0 for summary output" 0 "$LAST_EXIT"
 assert_output_contains "prints executive snapshot" "Executive snapshot:"
 assert_output_contains "includes merged per-check scan coverage heading" "### Per-check scan coverage"
@@ -537,8 +552,8 @@ if command -v yq >/dev/null 2>&1; then
   echo ""
   echo "▶ aggregate_risk_summary.sh with container_registry=public"
   setup
-  mkdir -p "$TMP/target" "$TMP/results"
-  cat > "$TMP/target/.guardrails.yml" <<'EOF'
+  mkdir -p "$TMP/scan_repo" "$TMP/results"
+  cat > "$TMP/scan_repo/.guardrails.yml" <<'EOF'
 context:
   visibility: public
   software_type: open_source
@@ -550,7 +565,7 @@ EOF
   cat > "$TMP/results/CICD-SEC-08.json" <<'EOF'
 {"check_id":"CICD-SEC-08","title":"Action pinning check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"}
 EOF
-  run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results"
+  run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/scan_repo" "$TMP/results"
   assert_exit "summary completes with public registry" 0 "$LAST_EXIT"
   assert_output_contains "shows public container_registry" "container_registry: \`public\`"
   teardown
@@ -558,11 +573,11 @@ EOF
   echo ""
   echo "▶ aggregate_risk_summary.sh shows softened-mode note"
   setup
-  mkdir -p "$TMP/target" "$TMP/results"
+  mkdir -p "$TMP/scan_repo" "$TMP/results"
   cat > "$TMP/results/CICD-SEC-08.json" <<'EOF'
 {"check_id":"CICD-SEC-08","title":"Action pinning check","status":"WARN","mode":"warn","counts":{"errors":0,"warnings":1,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"}
 EOF
-  run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/target" "$TMP/results"
+  run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/scan_repo" "$TMP/results"
   assert_exit "summary completes with softened check" 0 "$LAST_EXIT"
   assert_output_contains "shows mode override note" "per-check override"
   teardown

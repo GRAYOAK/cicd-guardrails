@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/config.sh
 source "${SCRIPT_DIR}/lib/config.sh"
 
-TARGET_DIR="${1:-target}"
+TARGET_DIR="${1:-scan_repo}"
 RESULTS_DIR="${2:-guardrails-results}"
 
 cfg_init "$TARGET_DIR"
