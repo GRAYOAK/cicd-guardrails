@@ -273,6 +273,25 @@ validation_skip_paths:
 
 **Upgrades für Consumer:** siehe [`migrations/README.md`](migrations/README.md). Während der Entwicklung Snippets unter [`migrations/.unreleased/`](migrations/.unreleased/) ergänzen; beim Release werden sie zu `migrations/vX.Y.Z.md` zusammengeführt. Die [`CHANGELOG.md`](CHANGELOG.md) wird durch **release-please** aus **Conventional Commits** gepflegt — nicht manuell umschreiben, wenn die Datei das so vorsieht; sichtbare Änderungen über Commit-Messages (`feat:`, `fix:`, `feat!:` usw.) einspielen.
 
+#### Release-Workflow: GitHub App (Maintainer)
+
+Der Workflow [`.github/workflows/release.yml`](.github/workflows/release.yml) nutzt **release-please** mit einer org-weiten GitHub App, weil `GITHUB_TOKEN` in der Organisation keine Release-PRs erstellen darf.
+
+Voraussetzungen:
+
+1. **GitHub App** (org-weit, nur für Releases in diesem Repo) mit Repository-Permissions:
+   - **Contents**: Read and write
+   - **Pull requests**: Read and write
+   - **Issues**: Read and write
+2. App auf **cicd-guardrails** installieren.
+3. Org-Secrets (für dieses Repo sichtbar):
+   - **`APP_ID`** — numerische App-ID
+   - **`APP_PRIVATE_KEY`** — vollständiger PEM-Inhalt des Private Keys
+
+Der Job `assemble-migration` pusht nach einem Release ggf. Migration-Notes auf `main`; bei Branch Protection den App-Bot in die Bypass-Liste aufnehmen.
+
+Der Job `notify-demo-repos` nutzt eine **separate** App (`GUARDRAILS_CONSUMER_DISPATCH_APP_*`) — siehe unten.
+
 #### Demo-Repos: automatischer Pin-Bump nach Release
 
 Die Fixture-Repositories [`cicd-demo-errors`](https://github.com/Christopher-Rust/cicd-demo-errors) und [`cicd-demo-well`](https://github.com/Christopher-Rust/cicd-demo-well) können nach jedem erfolgreichen Release automatisch ein `repository_dispatch`-Ereignis erhalten und daraufhin einen PR öffnen, der `security.yml` und `.pre-commit-config.yaml` auf den **Release-Tag-Commit-SHA** hebt.

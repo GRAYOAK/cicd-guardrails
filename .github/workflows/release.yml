@@ -28,9 +28,25 @@ permissions:
 
 jobs:
 
+  # ── Mint org-wide release app token (GITHUB_TOKEN cannot open release PRs) ──
+  mint-release-token:
+    name: Mint release app token
+    runs-on: ubuntu-latest
+    outputs:
+      token: ${{ steps.release-app-token.outputs.token }}
+    steps:
+      - id: release-app-token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a  # v2.1.0
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          installation_retrieval_mode: repository
+          installation_retrieval_payload: ${{ github.repository }}
+
   # ── Open / update release PR, or cut a release when the PR is merged ──────
   release-please:
     name: 'release-please'
+    needs: mint-release-token
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,14 +63,14 @@ jobs:
       - id: rp
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7  # v5.0.0 (Node 24)
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ needs.mint-release-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
   # ── Consolidate migration snippets into a per-version migration file ──────
   assemble-migration:
     name: 'Assemble migration notes'
-    needs: release-please
+    needs: [release-please, mint-release-token]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -62,14 +78,14 @@ jobs:
     env:
       VERSION: ${{ needs.release-please.outputs.version }}
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ needs.mint-release-token.outputs.token }}
     steps:
       - name: Checkout main at the new tag
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
           ref: main
           fetch-depth: 0
-          persist-credentials: true
+          token: ${{ needs.mint-release-token.outputs.token }}
 
       - name: Determine previous version
         id: prev
