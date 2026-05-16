@@ -1,0 +1,18 @@
+# Reusable workflow: dynamic guardrails repository checkout
+
+## Who is affected
+
+Consumer repositories that call `full-scan.yml` from a fork or org other than `Christopher-Rust/cicd-guardrails` (for example `GRAYOAK/cicd-guardrails`).
+
+## What changed
+
+The reusable workflow no longer hardcodes `repository: Christopher-Rust/cicd-guardrails` when checking out guardrails scripts. It parses both `owner/repo` and the commit ref from `GITHUB_WORKFLOW_REF`.
+
+## Action required
+
+- Pin to a commit that includes this fix (or upgrade to the release that contains it).
+- No changes to caller `security.yml` beyond bumping the pinned SHA, unless you temporarily worked around the bug with `skip-checks`.
+
+## Symptom before fix
+
+Checkout step fails with `fatal: couldn't find remote ref refs/pull/<N>/merge` while syncing `Christopher-Rust/cicd-guardrails` during a pull request workflow run.

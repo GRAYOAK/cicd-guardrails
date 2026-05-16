@@ -50,14 +50,27 @@ jobs:
       contents: read
     outputs:
       guardrails-ref: ${{ steps.ref.outputs.ref }}
+      guardrails-repository: ${{ steps.ref.outputs.repository }}
     steps:
-      - name: Extract guardrails ref from GITHUB_WORKFLOW_REF
+      - name: Extract guardrails repository and ref from GITHUB_WORKFLOW_REF
         id: ref
         # GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/file.yml@<SHA>"
-        # After the last @ is the exact ref used to invoke this workflow.
         run: |
-          REF="${GITHUB_WORKFLOW_REF##*@}"
-          echo "ref=$REF" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          WF="${GITHUB_WORKFLOW_REF}"
+          REF="${WF##*@}"
+          REPO="${WF%%/.github*}"
+          if [[ -z "$REF" || "$REF" == "$WF" ]]; then
+            echo "::error::Could not parse guardrails ref from GITHUB_WORKFLOW_REF=${WF}"
+            exit 1
+          fi
+          if [[ "$REPO" == "$WF" || "$REPO" != */* ]]; then
+            echo "::error::Could not parse guardrails repository from GITHUB_WORKFLOW_REF=${WF}"
+            exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "repository=$REPO" >> "$GITHUB_OUTPUT"
+          echo "Guardrails-Repository: $REPO"
           echo "Guardrails-Ref: $REF"
 
   # ── Result aggregation ────────────────────────────────────────────────────
@@ -87,7 +100,7 @@ jobs:
       - name: Checkout guardrails scripts
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
@@ -125,7 +138,7 @@ jobs:
       - name: Checkout guardrails scripts
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
@@ -158,7 +171,7 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
@@ -189,7 +202,7 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
@@ -220,7 +233,7 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
@@ -252,7 +265,7 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
@@ -293,7 +306,7 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
@@ -325,7 +338,7 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
@@ -357,7 +370,7 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
@@ -388,7 +401,7 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: Christopher-Rust/cicd-guardrails
+          repository: ${{ needs.setup.outputs.guardrails-repository }}
           ref: ${{ needs.setup.outputs.guardrails-ref }}
           path: guardrails
 
