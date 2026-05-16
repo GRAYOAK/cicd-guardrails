@@ -1,7 +1,110 @@
 # cicd-guardrails
 
-Wiederverwendbare GitHub Actions Workflows die automatisch gegen häufige CI/CD-Sicherheitsfehler prüfen.  
-Grundlage: [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top-10-ci-cd-security-risks/).
+**Inhalt:** [Über dieses Repository](#über-dieses-repository) · [Quick Start](#quick-start) · [Was wird geprüft?](#was-wird-geprüft) · [Einbindung in andere Repos](#einbindung-in-andere-repos) · [Repo-Struktur](#repo-struktur) · [Entwicklung an diesem Repository](#entwicklung-an-diesem-repository) · [Dependabot aktivieren](#dependabot-aktivieren) · [Hinweise](#hinweise)
+
+---
+
+## Über dieses Repository
+
+Dieses Repository liefert wiederverwendbare Sicherheitsprüfungen für CI/CD-Pipelines — als GitHub Actions Workflow, als pre-commit Hooks und als ausführbare Shell-Skripte. Die Checks orientieren sich an den [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top-10-ci-cd-security-risks/).
+
+Die **Implementierung** (Skripte, Workflow-Definitionen, Hook-Metadaten) liegt ausschließlich hier in `cicd-guardrails`. **Geprüft** wird immer ein **Ziel-Repository** — eure Anwendung, euer Service oder euer Monorepo. Ihr bindet Guardrails ein und pinnt eine feste Version; ihr kopiert die Check-Skripte nicht ins Ziel-Repo.
+
+---
+
+## Quick Start
+
+> **Version pinnen (essentiell):** Check-Code und Workflow-Definitionen stammen **immer** aus diesem Repository — nicht aus dem Ziel-Repo kopieren. Für **jede** Nutzung (CI, pre-commit, lokale Skripte aus einem Clone) dieselbe **40-Zeichen-Commit-SHA** verwenden; **nie** `@main`, `@master` oder bewegliche Tags als einzige Referenz. **CI** und **pre-commit** im Ziel-Repo sollten denselben `rev` bzw. `@SHA` teilen, damit lokal und in der Pipeline dasselbe Verhalten gilt.
+>
+> SHA ermitteln (Platzhalter `YOUR_ORG` anpassen):
+>
+> ```bash
+> git ls-remote https://github.com/YOUR_ORG/cicd-guardrails HEAD
+> # Output: abc123...def456  HEAD
+> ```
+>
+> Nach einem Release: [`migrations/README.md`](migrations/README.md) und Release-Assets lesen. Referenz-Ziel-Repos: [`cicd-demo-well`](https://github.com/Christopher-Rust/cicd-demo-well) (compliant) und [`cicd-demo-errors`](https://github.com/Christopher-Rust/cicd-demo-errors) (negative Fixtures) — dort `security.yml` und `.pre-commit-config.yaml` ohne festen SHA in dieser Doku; immer Platzhalter `<SHA>` durch euren Pin ersetzen.
+>
+> **Geprüft wird euer Ziel-Repository; geliefert wird die gepinnte Version von hier.**
+
+### Lokaler Check
+
+**Voraussetzungen:** `bash`; `yq` empfohlen (mehrere Checks und `.guardrails.yml`); optional `gitleaks` für `CICD-SEC-06`; API-Checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) benötigen `GH_TOKEN` und `GITHUB_REPOSITORY`.
+
+1. Dieses Repository klonen und auf **dieselbe SHA** wie in CI/pre-commit auschecken: `git checkout <SHA>`.
+2. Einzelne Checks gegen das **Ziel-Repo** ausführen (Pfad = Repository-Root des Ziels):
+
+```bash
+bash scripts/checks/domain/cicd_sec_04.sh                 /pfad/zum/ziel-repo
+bash scripts/checks/domain/cicd_sec_08.sh                 /pfad/zum/ziel-repo
+bash scripts/checks/domain/cicd_sec_05_permissions.sh     /pfad/zum/ziel-repo
+bash scripts/checks/domain/cicd_sec_03.sh                 /pfad/zum/ziel-repo
+bash scripts/checks/domain/cicd_sec_05_runner_access.sh   /pfad/zum/ziel-repo
+bash scripts/checks/domain/cicd_sec_07_runner_hardening.sh /pfad/zum/ziel-repo
+GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo \
+  bash scripts/checks/domain/cicd_sec_01_flow.sh /pfad/zum/ziel-repo
+GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo \
+  bash scripts/checks/domain/cicd_sec_05_branch.sh /pfad/zum/ziel-repo
+```
+
+**Maintainer** (Änderungen an Guardrails selbst): Regressionstests im Clone — siehe [Entwicklung an diesem Repository](#entwicklung-an-diesem-repository).
+
+### Pre-commit Hook
+
+Im **Ziel-Repo** eine `.pre-commit-config.yaml` anlegen. Hook-Definitionen kommen aus [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml) dieses Repos; `rev` muss die **gleiche SHA** wie der CI-Workflow sein.
+
+```yaml
+# .pre-commit-config.yaml (im Ziel-Repo)
+repos:
+  - repo: https://github.com/YOUR_ORG/cicd-guardrails
+    rev: <SHA>   # dieselbe 40-Zeichen-SHA wie full-scan.yml@<SHA>
+    hooks:
+      - id: cicd-sec-04
+      - id: cicd-sec-08
+      - id: cicd-sec-05-permissions
+      - id: cicd-sec-05-runner-access
+      - id: cicd-sec-07-runner-hardening
+      - id: cicd-sec-03
+      - id: cicd-sec-06
+        stages: [manual]
+```
+
+Die Hooks analysieren Dateien im Ziel-Repo (pre-commit setzt das Arbeitsverzeichnis auf `.`). API-Kontext-Checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) sind bewusst **nicht** als Standard-Hooks vorgesehen — dafür CI mit optionalem Admin-Token.
+
+Vollständiges Beispiel: [cicd-demo-well `.pre-commit-config.yaml`](https://github.com/Christopher-Rust/cicd-demo-well/blob/main/.pre-commit-config.yaml).
+
+### CI-Check (GitHub Actions)
+
+Im **Ziel-Repo** `.github/workflows/security.yml` (Minimalvariante ohne GitHub App):
+
+```yaml
+name: CI/CD Security Guardrails
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  guardrails:
+    uses: YOUR_ORG/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
+    with:
+      strict: true
+```
+
+Ohne Admin-Token laufen alle dateibasierten Checks; API-Checks (`cicd-sec-01-flow`, `cicd-sec-05-branch`) können eingeschränkt oder übersprungen sein.
+
+Referenz im Ziel-Repo: [cicd-demo-well `security.yml`](https://github.com/Christopher-Rust/cicd-demo-well/blob/main/.github/workflows/security.yml).
+
+Vollständiges Setup (GitHub App, Branch Protection, `skip-checks`, `.guardrails.yml`): Abschnitt [Einbindung in andere Repos](#einbindung-in-andere-repos).
+
+---
+
+**Als Nächstes:** [Was wird geprüft?](#was-wird-geprüft) · [Einbindung in andere Repos](#einbindung-in-andere-repos)
 
 ---
 
@@ -27,23 +130,20 @@ Jeder Check schreibt neben **Searched** / **Found** / **Remediation** einen Absc
 
 Die pro Job geschriebenen JSON-Ergebnisdateien enthalten zusätzlich **`scan_coverage_markdown`**. Der Job **Risk summary** (`scripts/aggregate_risk_summary.sh`) fügt daraus den Block **Per-check scan coverage** in die Markdown-Zusammenfassung ein. Im Modus **`full`** ist die Pfadliste weiterhin begrenzt (Standard 2000, über **`GUARDRAILS_COVERAGE_FULL_MAX_PATHS`** anpassbar), damit sehr große Monorepos stabil bleiben.
 
-> **Migrationshinweis (Breaking Change):** Job-IDs und `skip-checks`-Tokens bleiben `cicd-sec-*`. **Display-Namen** (Scope-Emoji 🧩/⚙️, `Code |` / `Settings |`, Themen-Emoji, Text) müssen in Branch Protection exakt gematcht werden. Nach einem Workflow-Pin-Update ggf. Required-Checks anpassen. Mapping siehe Abschnitt Branch Protection.
+> **Migrationshinweis (Breaking Change):** Job-IDs und `skip-checks`-Tokens bleiben `cicd-sec-*`. **Display-Namen** (Scope-Emoji 🧩/⚙️, `Code |` / `Settings |`, Themen-Emoji, Text) müssen in Branch Protection exakt gematcht werden. Nach einem Workflow-Pin-Update ggf. Required-Checks anpassen. Mapping siehe Abschnitt [Branch Protection konfigurieren](#branch-protection-konfigurieren-prs-blockieren).
 
 ---
 
 ## Einbindung in andere Repos
 
-### 1. SHA des Guardrails-Repos ermitteln
+SHA ermitteln, Minimal-Workflow und pre-commit-Setup: [Quick Start](#quick-start). Die folgenden Abschnitte beschreiben das vollständige Rollout im **Ziel-Repo**.
 
-```bash
-git ls-remote https://github.com/YOUR_ORG/cicd-guardrails HEAD
-# Output: abc123...def456  HEAD
-```
+### Workflow mit Admin-Token (optional)
 
-### 2. Workflow im Ziel-Repo anlegen
+Für vollständige API-Checks (`cicd-sec-01-flow`, `cicd-sec-05-branch`) im Ziel-Repo eine GitHub App mit `Administration: Read` nutzen und ein kurzlebiges Token an den reusable Workflow übergeben:
 
 ```yaml
-# .github/workflows/security.yml
+# .github/workflows/security.yml (im Ziel-Repo)
 name: CI/CD Security Guardrails
 
 on:
@@ -56,9 +156,6 @@ permissions:
   contents: read
 
 jobs:
-  # GitHub App Token für branch-protection Reads erzeugen.
-  # Voraussetzung: GitHub App mit Administration:Read installiert +
-  # Secrets APP_ID und APP_PRIVATE_KEY im Repo hinterlegt.
   generate-token:
     name: 'App Token generieren'
     runs-on: ubuntu-latest
@@ -75,20 +172,16 @@ jobs:
 
   guardrails:
     needs: generate-token
-    uses: Christopher-Rust/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
-    #                                                                        ^^^^^
-    #               Immer auf vollständigen SHA pinnen – nie @main oder @v1!
+    uses: YOUR_ORG/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
     with:
       strict: true
     secrets:
       admin-token: ${{ needs.generate-token.outputs.token }}
 ```
 
-> **Ohne GitHub App:** Den `generate-token` Job weglassen und `secrets:` Block entfernen.
-> Die branch-API-Checks (`cicd-sec-01-flow`, `cicd-sec-05-branch`) können ohne Admin-Token skipped oder eingeschränkt sein.
-> Alle file-basierten Checks laufen normal weiter.
+> **Ohne GitHub App:** Den `generate-token` Job weglassen und den `secrets:` Block entfernen — wie im [Quick Start](#ci-check-github-actions). Die branch-API-Checks können ohne Admin-Token skipped oder eingeschränkt sein; alle dateibasierten Checks laufen normal weiter.
 
-### 3. Branch Protection konfigurieren (PRs blockieren)
+### Branch Protection konfigurieren (PRs blockieren)
 
 GitHub → Repo Settings → Branches → Add rule → `main`:
 
@@ -106,7 +199,7 @@ GitHub → Repo Settings → Branches → Add rule → `main`:
   - `⚙️ Settings | 🛂 05-branch — Branch governance` ← nur mit Admin-Token sinnvoll
 - ✅ Do not allow bypassing the above settings
 
-### 4. Migrationsmodus für bestehende Repos
+### Migrationsmodus für bestehende Repos
 
 Es gibt zwei komplementäre Hebel:
 
@@ -123,7 +216,7 @@ jobs:
 
 **Repo-seitig** über `.guardrails.yml` – einzelne Checks auf `warn` oder `off` schalten, ohne den Caller anzufassen. Siehe Abschnitt _Pro-Check Severity-Override_.
 
-### 5. Risiko-Kontext über `.guardrails.yml` steuern
+### Risiko-Kontext über `.guardrails.yml` steuern
 
 Der finale Job `📊 Risk summary` liest optional eine Datei `.guardrails.yml` im Ziel-Repo
 und gewichtet Findings kontextabhängig.
@@ -198,7 +291,7 @@ Ohne diese beiden Secrets bleibt der Release-Workflow grün; der Job `notify-dem
 
 **Benachrichtigung:** GitHub benachrichtigt Abonnenten wie bei jedem anderen neuen PR (Watch → *Pull requests* oder *Participating*). Zusätzliche Webhooks sind nicht vorgesehen.
 
-### 6. Pro-Check Severity-Override
+### Pro-Check Severity-Override
 
 Für graduelles Ausrollen kann jeder Check pro Repository auf einen anderen Modus gestellt werden, ohne den globalen `strict`-Switch des Callers zu verändern. Schlüssel ist die OWASP-Designation, Wert ein Modus:
 
@@ -219,7 +312,7 @@ checks:
 
 Abgrenzung: `skip-checks` (Workflow-Input) gehört dem Caller und überspringt einen Check ganz; `mode: off` gehört dem Ziel-Repo und macht das gleiche, aber mit dokumentiertem Status im Summary. Beide Hebel sind unabhängig nutzbar.
 
-### 7. Final Summary lesen
+### Final Summary lesen
 
 Die finale Ausgabe im Job `📊 Risk summary` ist auf schnelle Priorisierung optimiert:
 
@@ -304,59 +397,35 @@ cicd-guardrails/
 
 ---
 
-## Lokale Ausführung
+## Entwicklung an diesem Repository
+
+### Regressionstests
 
 ```bash
-# Einzelnen Check manuell gegen ein Repo ausführen
-bash scripts/checks/domain/cicd_sec_04.sh                /pfad/zum/repo
-bash scripts/checks/domain/cicd_sec_08.sh                /pfad/zum/repo
-bash scripts/checks/domain/cicd_sec_05_permissions.sh    /pfad/zum/repo  # benötigt yq
-bash scripts/checks/domain/cicd_sec_03.sh                /pfad/zum/repo
-bash scripts/checks/domain/cicd_sec_05_runner_access.sh  /pfad/zum/repo
-bash scripts/checks/domain/cicd_sec_07_runner_hardening.sh /pfad/zum/repo
-GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo bash scripts/checks/domain/cicd_sec_01_flow.sh /pfad/zum/repo
-GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo bash scripts/checks/domain/cicd_sec_05_branch.sh /pfad/zum/repo
-
-# Tests ausführen
 bash tests/test_checks.sh
 ```
 
-### Pre-commit integration for consumer repositories
+### Checks gegen dieses Repo (Dogfooding)
 
-`cicd-guardrails` now publishes reusable pre-commit hook definitions via `.pre-commit-hooks.yaml`.
-Consumer repositories can pin this repository to the same commit SHA used by the reusable workflow.
+Einzelne Checks mit Ziel `.` (Repository-Root von Guardrails), aus dem Guardrails-Clone:
 
-Example:
-
-```yaml
-# .pre-commit-config.yaml
-repos:
-  - repo: https://github.com/Christopher-Rust/cicd-guardrails
-    rev: <same-40-char-sha-as-full-scan-workflow>
-    hooks:
-      - id: cicd-sec-04
-      - id: cicd-sec-08
-      - id: cicd-sec-05-permissions
-      - id: cicd-sec-05-runner-access
-      - id: cicd-sec-07-runner-hardening
-      - id: cicd-sec-03
-      - id: cicd-sec-06
-        stages: [manual]
+```bash
+bash scripts/checks/domain/cicd_sec_04.sh .
+bash scripts/checks/domain/cicd_sec_08.sh .
+# … weitere Checks wie im Quick Start, Pfad . statt /pfad/zum/ziel-repo
 ```
 
-Local-first hooks are intentionally focused on repository-file analysis.
-API-context checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) remain workflow-focused and are not enabled as default pre-commit hooks.
+In CI prüft [`.github/workflows/self-test.yml`](.github/workflows/self-test.yml) ausgewählte Checks auf diesem Repo.
 
-### Modular package check architecture
+### Modular package check architecture (`CICD-SEC-03`)
 
-`CICD-SEC-03` keeps its public designation and workflow wiring, but internally uses a dispatcher pattern.
-The top-level check script orchestrates language modules with a stable interface:
+`CICD-SEC-03` behält seine öffentliche Designation und Workflow-Anbindung, nutzt intern aber ein Dispatcher-Muster. Das Top-Level-Skript orchestriert Sprachmodule mit stabiler Schnittstelle:
 
 - input: repository root path
 - output: findings via shared reporting library
 - exit semantics: `0` (pass/warn), `1` (fail), `2` (missing runtime dependency)
 
-Current language modules:
+Aktuelle Sprachmodule:
 
 - `scripts/checks/domain/package/js_ts.sh`
 - `scripts/checks/domain/package/python.sh`
@@ -365,7 +434,7 @@ Current language modules:
 - `scripts/checks/domain/package/ruby.sh`
 - `scripts/checks/domain/package/php.sh`
 
-This design supports repositories with one service at root and monorepos with many nested services.
+Das unterstützt Repositories mit einem Service im Root und Monorepos mit vielen verschachtelten Services.
 
 ---
 
@@ -385,6 +454,8 @@ updates:
 ---
 
 ## Hinweise
+
+**Version pinnen:** Siehe [Quick Start](#quick-start) — für CI, pre-commit und lokale Skripte aus einem Clone dieselbe Commit-SHA verwenden; nie ungepinnte Branch-Referenzen als einzige Quelle.
 
 **gitleaks SHA:** Der `cicd-sec-06` Job lädt gitleaks herunter. Den Versions-Pin in `full-scan.yml` ggf. an die aktuelle Release ([gitleaks Releases](https://github.com/gitleaks/gitleaks/releases)) anpassen.
 
