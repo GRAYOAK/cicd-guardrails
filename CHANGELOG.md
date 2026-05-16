@@ -11,6 +11,14 @@ This file is maintained automatically by [release-please](https://github.com/goo
 For breaking-change migration steps targeted at automated consumers (including AI agents), see the
 companion file `migrations/v<X.Y.Z>.md` released alongside each version.
 
+## [0.3.2](https://github.com/GRAYOAK/cicd-guardrails/compare/v0.3.1...v0.3.2) (2026-05-16)
+
+
+### Bug Fixes
+
+* only flag YAML uses keys in workflow action pin audit ([04234e8](https://github.com/GRAYOAK/cicd-guardrails/commit/04234e8e7f70ae492d68e227e8cf4eee0ea35bea))
+* require explicit guardrails pin inputs for cross-repo callers ([337553d](https://github.com/GRAYOAK/cicd-guardrails/commit/337553d5212bf391d96274871323a9f9951a1855))
+
 ## [0.3.1](https://github.com/GRAYOAK/cicd-guardrails/compare/v0.3.0...v0.3.1) (2026-05-16)
 
 
