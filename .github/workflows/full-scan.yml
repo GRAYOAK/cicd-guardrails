@@ -9,9 +9,8 @@ name: CI/CD Security Full Scan
 #       with:
 #         strict: true
 #
-# The guardrails SHA is parsed from GITHUB_WORKFLOW_REF – the exact ref used
-# when this reusable workflow was invoked (for example @f878a48...).
-# This keeps workflow definition and scripts in sync.
+# Cross-repo workflow_call: pass guardrails-repository and guardrails-ref inputs
+# matching the uses: ...@<SHA> pin (GITHUB_WORKFLOW_REF points at the caller).
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -31,6 +30,16 @@ on:
           cicd-sec-06, cicd-sec-07-runner-hardening, cicd-sec-08
         type: string
         default: ''
+      guardrails-repository:
+        description: >
+          Owner/repo of the guardrails source (must match the uses: repository pin).
+        type: string
+        required: true
+      guardrails-ref:
+        description: >
+          40-character commit SHA of the guardrails pin (same as in uses: ...@<SHA>).
+        type: string
+        required: true
     secrets:
       admin-token:
         description: >
@@ -42,36 +51,50 @@ permissions:
 
 jobs:
 
-  # ── Setup: extract guardrails ref from workflow call ─────────────────────
+  # ── Setup: validate caller-supplied guardrails pin (required for cross-repo calls) ─
   setup:
     name: 'Setup'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      guardrails-ref: ${{ steps.ref.outputs.ref }}
-      guardrails-repository: ${{ steps.ref.outputs.repository }}
+      guardrails-ref: ${{ inputs.guardrails-ref }}
+      guardrails-repository: ${{ inputs.guardrails-repository }}
     steps:
-      - name: Extract guardrails repository and ref from GITHUB_WORKFLOW_REF
-        id: ref
-        # GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/file.yml@<SHA>"
+      - name: Validate guardrails repository and ref inputs
         run: |
           set -euo pipefail
-          WF="${GITHUB_WORKFLOW_REF}"
-          REF="${WF##*@}"
-          REPO="${WF%%/.github*}"
-          if [[ -z "$REF" || "$REF" == "$WF" ]]; then
-            echo "::error::Could not parse guardrails ref from GITHUB_WORKFLOW_REF=${WF}"
+          REPO="${{ inputs.guardrails-repository }}"
+          REF="${{ inputs.guardrails-ref }}"
+          if [[ "$REPO" != */* ]]; then
+            echo "::error::guardrails-repository must be owner/repo, got: ${REPO}"
             exit 1
           fi
-          if [[ "$REPO" == "$WF" || "$REPO" != */* ]]; then
-            echo "::error::Could not parse guardrails repository from GITHUB_WORKFLOW_REF=${WF}"
+          if [[ ! "$REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::guardrails-ref must be a 40-character commit SHA, got: ${REF}"
             exit 1
           fi
-          echo "ref=$REF" >> "$GITHUB_OUTPUT"
-          echo "repository=$REPO" >> "$GITHUB_OUTPUT"
-          echo "Guardrails-Repository: $REPO"
-          echo "Guardrails-Ref: $REF"
+          echo "Guardrails-Repository: ${REPO}"
+          echo "Guardrails-Ref: ${REF}"
+
+      - name: Verify guardrails repository is reachable
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
+        with:
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
+          path: guardrails-probe
+          fetch-depth: 1
+
+      - name: Verify guardrails scripts are present
+        run: |
+          set -euo pipefail
+          SCRIPT="guardrails-probe/scripts/checks/domain/cicd_sec_03.sh"
+          if [[ ! -f "$SCRIPT" ]]; then
+            echo "::error::Guardrails checkout at ${{ inputs.guardrails-ref }} does not contain expected scripts (missing ${SCRIPT})."
+            echo "::error::Check guardrails-repository (${{ inputs.guardrails-repository }}), org Actions policy, and that the SHA matches your uses: pin."
+            exit 1
+          fi
+          echo "Guardrails scripts verified at pinned ref."
 
   # ── Result aggregation ────────────────────────────────────────────────────
   summarize:
@@ -100,8 +123,8 @@ jobs:
       - name: Checkout guardrails scripts
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - name: Download check artifacts (best-effort)
@@ -138,8 +161,8 @@ jobs:
       - name: Checkout guardrails scripts
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_04.sh target
@@ -171,8 +194,8 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_08.sh target
@@ -202,8 +225,8 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_05_permissions.sh target
@@ -233,8 +256,8 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_03.sh target ${{ inputs.strict && '--strict' || '' }}
@@ -265,8 +288,8 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - name: Install gitleaks
@@ -306,8 +329,8 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_01_flow.sh target ${{ inputs.strict && '--strict' || '' }}
@@ -338,8 +361,8 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_05_branch.sh target ${{ inputs.strict && '--strict' || '' }}
@@ -370,8 +393,8 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_05_runner_access.sh target ${{ inputs.strict && '--strict' || '' }}
@@ -401,8 +424,8 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
         with:
-          repository: ${{ needs.setup.outputs.guardrails-repository }}
-          ref: ${{ needs.setup.outputs.guardrails-ref }}
+          repository: ${{ inputs.guardrails-repository }}
+          ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_07_runner_hardening.sh target ${{ inputs.strict && '--strict' || '' }}
