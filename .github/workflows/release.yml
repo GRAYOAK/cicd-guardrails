@@ -32,6 +32,7 @@ jobs:
   mint-release-token:
     name: Mint release app token
     runs-on: ubuntu-latest
+    permissions: {}
     outputs:
       token: ${{ steps.release-app-token.outputs.token }}
     steps:
