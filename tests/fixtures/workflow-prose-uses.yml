@@ -1,0 +1,21 @@
+# FIXTURE: prose containing "uses:" must not be flagged as unpinned actions
+
+name: Prose uses colon
+
+on:
+  workflow_call:
+    inputs:
+      example:
+        description: >
+          Document the uses: repository pin and uses: ...@<SHA> pattern for callers.
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
+      - run: echo "Reminder about your uses: pin in security.yml"

@@ -14,7 +14,8 @@ action_pin_scan_file() {
     {
       line = $0
       sub(/#.*$/, "", line)
-      if (line !~ /uses:/) next
+      # Only YAML action steps: leading optional "  - " then uses:
+      if (line !~ /^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]/) next
       if (line ~ /uses:[[:space:]]*\.\//) next
       if (line ~ /@[0-9a-f]{40}[[:space:]]*$/) next
       print NR ": " $0

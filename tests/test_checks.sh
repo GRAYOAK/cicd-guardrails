@@ -148,6 +148,15 @@ assert_exit "fails when npm lockfile is missing" 1 "$LAST_EXIT"
 teardown
 
 echo ""
+echo "▶ cicd_sec_03.sh ignores uses: in workflow prose"
+setup
+mkdir -p "$TMP/.github/workflows"
+cp "$FIXTURES_DIR/workflow-prose-uses.yml" "$TMP/.github/workflows/prose.yml"
+run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+assert_exit "passes when only prose contains uses:" 0 "$LAST_EXIT"
+teardown
+
+echo ""
 echo "▶ cicd_sec_03.sh validation_skip_paths (requires yq)"
 if command -v yq >/dev/null 2>&1; then
   setup
