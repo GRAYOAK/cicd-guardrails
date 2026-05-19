@@ -21,23 +21,23 @@ jobs:
       - run: bash tests/test_checks.sh
 
   # ── Dogfood these checks on this repo ─────────────────────────────────────
-  self-cicd-sec-04:
-    name: 'Self-Check: 🧩 Code | 🚨 04 — pull request target trigger'
+  self-cicd-sec-04-poisoned-pipeline:
+    name: 'Self-Check: 🧩 Code | 🚨 04-poisoned-pipeline — Poisoned pipeline'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
-      - run: bash scripts/checks/domain/cicd_sec_04.sh .
+      - run: bash scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh .
 
-  self-cicd-sec-08:
-    name: 'Self-Check: 🧩 Code | 📌 08 — Action SHA pinning'
+  self-cicd-sec-08-action-pinning:
+    name: 'Self-Check: 🧩 Code | 📌 08-action-pinning — Action SHA pinning'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
-      - run: bash scripts/checks/domain/cicd_sec_08.sh .
+      - run: bash scripts/checks/domain/cicd_sec_08_action_pinning.sh .
 
   self-cicd-sec-05-permissions:
     name: 'Self-Check: 🧩 Code | 🔐 05-permissions — Workflow permissions'
@@ -48,11 +48,11 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
       - run: bash scripts/checks/domain/cicd_sec_05_permissions.sh .
 
-  self-cicd-sec-03:
-    name: 'Self-Check: 🧩 Code | 🔒 03 — Dependency lockfiles'
+  self-cicd-sec-03-dependency-chain:
+    name: 'Self-Check: 🧩 Code | 🔒 03-dependency-chain — Dependency chain'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
-      - run: bash scripts/checks/domain/cicd_sec_03.sh .
+      - run: bash scripts/checks/domain/cicd_sec_03_dependency_chain.sh .

@@ -109,10 +109,10 @@ EOF
 }
 
 echo ""
-echo "▶ cicd_sec_04.sh"
+echo "▶ cicd_sec_04_poisoned_pipeline.sh"
 setup
 cp "$FIXTURES_DIR/bad-prt.yml" "$TMP/.github/workflows/ci.yml"
-run_check "$DOMAIN_DIR/cicd_sec_04.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_04_poisoned_pipeline.sh" "$TMP"
 assert_exit "detects pull_request_target usage" 1 "$LAST_EXIT"
 assert_output_contains "includes Searched block" "### Searched"
 assert_output_contains "includes Scan coverage block" "### Scan coverage"
@@ -122,11 +122,11 @@ assert_output_contains "renders Mode line" "Mode: **fail**"
 teardown
 
 echo ""
-echo "▶ cicd_sec_08.sh"
+echo "▶ cicd_sec_08_action_pinning.sh"
 setup
 mkdir -p "$TMP/actions/sample"
 cp "$FIXTURES_DIR/bad-pinning.yml" "$TMP/actions/sample/action.yml"
-run_check "$DOMAIN_DIR/cicd_sec_08.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_08_action_pinning.sh" "$TMP"
 assert_exit "detects unpinned action references in composite action" 1 "$LAST_EXIT"
 teardown
 
@@ -140,24 +140,24 @@ assert_output_contains "uses CICD-SEC-05-PERMISSIONS designation" "CICD-SEC-05-P
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh"
+echo "▶ cicd_sec_03_dependency_chain.sh"
 setup
 echo '{"name":"demo"}' > "$TMP/package.json"
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when npm lockfile is missing" 1 "$LAST_EXIT"
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh ignores uses: in workflow prose"
+echo "▶ cicd_sec_03_dependency_chain.sh ignores uses: in workflow prose"
 setup
 mkdir -p "$TMP/.github/workflows"
 cp "$FIXTURES_DIR/workflow-prose-uses.yml" "$TMP/.github/workflows/prose.yml"
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "passes when only prose contains uses:" 0 "$LAST_EXIT"
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh validation_skip_paths (requires yq)"
+echo "▶ cicd_sec_03_dependency_chain.sh validation_skip_paths (requires yq)"
 if command -v yq >/dev/null 2>&1; then
   setup
   mkdir -p "$TMP/vendor/nested" "$TMP/apps/web"
@@ -170,7 +170,7 @@ version: 1
 validation_skip_paths:
   - "vendor/*"
 EOF
-  run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
   assert_exit "passes when vendor tree skipped and app has lockfile" 0 "$LAST_EXIT"
   teardown
 else
@@ -178,7 +178,7 @@ else
 fi
 
 echo ""
-echo "▶ cicd_sec_03.sh monorepo with mixed services"
+echo "▶ cicd_sec_03_dependency_chain.sh monorepo with mixed services"
 setup
 mkdir -p "$TMP/services/api" "$TMP/services/worker"
 cat > "$TMP/services/api/package.json" <<'EOF'
@@ -188,13 +188,13 @@ cat > "$TMP/services/worker/package.json" <<'EOF'
 {"name":"worker","private":true}
 EOF
 echo '{}' > "$TMP/services/worker/package-lock.json"
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when one nested package.json misses lockfile" 1 "$LAST_EXIT"
 assert_output_contains "reports nested path for missing lockfile" "services/api/package.json"
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh passes for locked js monorepo"
+echo "▶ cicd_sec_03_dependency_chain.sh passes for locked js monorepo"
 setup
 mkdir -p "$TMP/apps/web" "$TMP/apps/docs"
 cat > "$TMP/apps/web/package.json" <<'EOF'
@@ -205,13 +205,13 @@ cat > "$TMP/apps/docs/package.json" <<'EOF'
 {"name":"docs","private":true}
 EOF
 echo '{}' > "$TMP/apps/docs/pnpm-lock.yaml"
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "passes when nested npm manifests have lockfiles" 0 "$LAST_EXIT"
 assert_output_contains "includes Scan coverage for manifests" "### Scan coverage"
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh fails for python pyproject without lockfile"
+echo "▶ cicd_sec_03_dependency_chain.sh fails for python pyproject without lockfile"
 setup
 mkdir -p "$TMP/services/py"
 cat > "$TMP/services/py/pyproject.toml" <<'EOF'
@@ -219,34 +219,34 @@ cat > "$TMP/services/py/pyproject.toml" <<'EOF'
 name = "py-service"
 version = "0.1.0"
 EOF
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when pyproject has no satisfier lockfile" 1 "$LAST_EXIT"
 assert_output_contains "reports missing python satisfier" "missing a required lock or hashed requirements"
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh fails for unpinned python requirements"
+echo "▶ cicd_sec_03_dependency_chain.sh fails for unpinned python requirements"
 setup
 mkdir -p "$TMP/services/py"
 cat > "$TMP/services/py/requirements.txt" <<'EOF'
 requests
 flask==3.0.3
 EOF
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails for non pinned requirements entry" 1 "$LAST_EXIT"
 assert_output_contains "reports unpinned dependency name" "Unpinned python dependency 'requests'."
 assert_output_contains "reports unpinned dependency with line number" "requirements.txt:1"
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh deduplicates remediation bullets"
+echo "▶ cicd_sec_03_dependency_chain.sh deduplicates remediation bullets"
 setup
 mkdir -p "$TMP/services/py"
 cat > "$TMP/services/py/requirements.txt" <<'EOF'
 requests
 flask
 EOF
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails for multiple unpinned requirements" 1 "$LAST_EXIT"
 remediation_count="$(printf '%s' "$LAST_OUTPUT" | awk '
   /^### Remediation$/ { in_rem=1; next }
@@ -265,7 +265,7 @@ fi
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh passes for pinned python dependencies"
+echo "▶ cicd_sec_03_dependency_chain.sh passes for pinned python dependencies"
 setup
 mkdir -p "$TMP/services/py"
 cat > "$TMP/services/py/pyproject.toml" <<'EOF'
@@ -285,12 +285,12 @@ files = [
     {file = "pytest-8.3.2-py3-none-any.whl", hash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
 ]
 EOF
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "passes for pyproject with valid poetry.lock hashes" 0 "$LAST_EXIT"
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh fails for ambiguous python triggers"
+echo "▶ cicd_sec_03_dependency_chain.sh fails for ambiguous python triggers"
 setup
 mkdir -p "$TMP/services/py"
 cat > "$TMP/services/py/pyproject.toml" <<'EOF'
@@ -299,20 +299,20 @@ name = "py-service"
 version = "0.1.0"
 EOF
 echo "requests" > "$TMP/services/py/requirements.in"
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails for disallowed multi-trigger set" 1 "$LAST_EXIT"
 assert_output_contains "reports ambiguous python triggers" "Ambiguous Python dependency triggers"
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh discovers files under scan_repo checkout path (CI layout)"
+echo "▶ cicd_sec_03_dependency_chain.sh discovers files under scan_repo checkout path (CI layout)"
 setup
 mkdir -p "$TMP/scan_repo/.github/workflows"
 cat > "$TMP/scan_repo/requirements.txt" <<'EOF'
 fastapi
 EOF
 cp "$FIXTURES_DIR/good-workflow.yml" "$TMP/scan_repo/.github/workflows/ci.yml"
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP/scan_repo"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP/scan_repo"
 assert_exit "fails for unpinned requirements under scan_repo path" 1 "$LAST_EXIT"
 assert_output_contains "finds python package_policy under scan_repo path" "Python package_policy: 1 director"
 assert_output_contains "evaluates workflow under scan_repo path" "Workflow YAML for third-party action pins: 1 files"
@@ -320,7 +320,7 @@ assert_output_contains "reports unpinned python dependency under scan_repo path"
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh fails for missing go lockfile"
+echo "▶ cicd_sec_03_dependency_chain.sh fails for missing go lockfile"
 setup
 mkdir -p "$TMP/services/go-api"
 cat > "$TMP/services/go-api/go.mod" <<'EOF'
@@ -328,13 +328,13 @@ module example.com/go-api
 
 go 1.22
 EOF
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when go.mod has no go.sum" 1 "$LAST_EXIT"
 assert_output_contains "reports missing go lockfile" "Missing go.sum next to go.mod."
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh fails for missing rust lockfile"
+echo "▶ cicd_sec_03_dependency_chain.sh fails for missing rust lockfile"
 setup
 mkdir -p "$TMP/services/rust-worker"
 cat > "$TMP/services/rust-worker/Cargo.toml" <<'EOF'
@@ -343,13 +343,13 @@ name = "rust-worker"
 version = "0.1.0"
 edition = "2021"
 EOF
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when Cargo.toml has no Cargo.lock" 1 "$LAST_EXIT"
 assert_output_contains "reports missing rust lockfile" "Missing Cargo.lock next to Cargo.toml."
 teardown
 
 echo ""
-echo "▶ cicd_sec_03.sh fails for missing ruby and php lockfiles"
+echo "▶ cicd_sec_03_dependency_chain.sh fails for missing ruby and php lockfiles"
 setup
 mkdir -p "$TMP/services/ruby-app" "$TMP/services/php-app"
 cat > "$TMP/services/ruby-app/Gemfile" <<'EOF'
@@ -358,7 +358,7 @@ EOF
 cat > "$TMP/services/php-app/composer.json" <<'EOF'
 {"name":"acme/php-app"}
 EOF
-run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when Gemfile or composer.json has no lockfile" 1 "$LAST_EXIT"
 assert_output_contains "reports missing ruby lockfile" "Missing Gemfile.lock next to Gemfile."
 assert_output_contains "reports missing php lockfile" "Missing composer.lock next to composer.json."
@@ -500,7 +500,7 @@ assert_output_contains "uses SEC-05 branch designation" "CICD-SEC-05-BRANCH"
 teardown
 
 echo ""
-echo "▶ cicd_sec_06.sh reports structured gitleaks findings"
+echo "▶ cicd_sec_06_secret_scan.sh reports structured gitleaks findings"
 setup
 git -C "$TMP" init -q
 git -C "$TMP" config user.email "guardrails@test.invalid"
@@ -545,7 +545,7 @@ exit 1
 EOF
 chmod +x "$TMP/gitleaks"
 pushd "$TMP" >/dev/null
-run_check "$DOMAIN_DIR/cicd_sec_06.sh" .
+run_check "$DOMAIN_DIR/cicd_sec_06_secret_scan.sh" .
 popd >/dev/null
 assert_exit "leaks fail in default fail mode" 1 "$LAST_EXIT"
 assert_output_contains "lists file line and rule in Found" "[error] config/app.env:3"
@@ -562,7 +562,7 @@ teardown
 
 if command -v yq >/dev/null 2>&1; then
   echo ""
-  echo "▶ cicd_sec_06.sh with mode=warn"
+  echo "▶ cicd_sec_06_secret_scan.sh with mode=warn"
   setup
   git -C "$TMP" init -q
   git -C "$TMP" config user.email "guardrails@test.invalid"
@@ -583,9 +583,9 @@ done
 exit 1
 EOF
   chmod +x "$TMP/gitleaks"
-  write_guardrails_yml "$TMP" "warn" "CICD-SEC-06"
+  write_guardrails_yml "$TMP" "warn" "CICD-SEC-06-SECRET-SCAN"
   pushd "$TMP" >/dev/null
-  run_check "$DOMAIN_DIR/cicd_sec_06.sh" .
+  run_check "$DOMAIN_DIR/cicd_sec_06_secret_scan.sh" .
   popd >/dev/null
   assert_exit "warn override keeps job green" 0 "$LAST_EXIT"
   assert_output_contains "renders Mode warn" "Mode: **warn**"
@@ -597,22 +597,22 @@ fi
 # ── Per-check severity override (mode warn / off) ─────────────────────────
 if command -v yq >/dev/null 2>&1; then
   echo ""
-  echo "▶ cicd_sec_03.sh with mode=warn"
+  echo "▶ cicd_sec_03_dependency_chain.sh with mode=warn"
   setup
   echo '{"name":"demo"}' > "$TMP/package.json"
-  write_guardrails_yml "$TMP" "warn" "CICD-SEC-03"
-  run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+  write_guardrails_yml "$TMP" "warn" "CICD-SEC-03-DEPENDENCY-CHAIN"
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
   assert_exit "warn override keeps job green" 0 "$LAST_EXIT"
   assert_output_contains "renders Mode warn" "Mode: **warn**"
   assert_output_contains "renders WARN status" "Status: **WARN**"
   teardown
 
   echo ""
-  echo "▶ cicd_sec_03.sh with mode=off"
+  echo "▶ cicd_sec_03_dependency_chain.sh with mode=off"
   setup
   echo '{"name":"demo"}' > "$TMP/package.json"
-  write_guardrails_yml "$TMP" "off" "CICD-SEC-03"
-  run_check "$DOMAIN_DIR/cicd_sec_03.sh" "$TMP"
+  write_guardrails_yml "$TMP" "off" "CICD-SEC-03-DEPENDENCY-CHAIN"
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
   assert_exit "off override keeps job green" 0 "$LAST_EXIT"
   assert_output_contains "renders Mode off" "Mode: **off**"
   assert_output_contains "renders SKIPPED status" "Status: **SKIPPED**"
@@ -657,8 +657,8 @@ context:
   data_sensitivity: medium
   deployment_criticality: dev
 EOF
-  cat > "$TMP/results/CICD-SEC-08.json" <<'EOF'
-{"check_id":"CICD-SEC-08","title":"Action pinning check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"}
+  cat > "$TMP/results/CICD-SEC-08-ACTION-PINNING.json" <<'EOF'
+{"check_id":"CICD-SEC-08-ACTION-PINNING","title":"Action pinning check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"}
 EOF
   run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/scan_repo" "$TMP/results"
   assert_exit "summary completes with public registry" 0 "$LAST_EXIT"
@@ -669,8 +669,8 @@ EOF
   echo "▶ aggregate_risk_summary.sh shows softened-mode note"
   setup
   mkdir -p "$TMP/scan_repo" "$TMP/results"
-  cat > "$TMP/results/CICD-SEC-08.json" <<'EOF'
-{"check_id":"CICD-SEC-08","title":"Action pinning check","status":"WARN","mode":"warn","counts":{"errors":0,"warnings":1,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"}
+  cat > "$TMP/results/CICD-SEC-08-ACTION-PINNING.json" <<'EOF'
+{"check_id":"CICD-SEC-08-ACTION-PINNING","title":"Action pinning check","status":"WARN","mode":"warn","counts":{"errors":0,"warnings":1,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"}
 EOF
   run_check "$SCRIPTS_DIR/aggregate_risk_summary.sh" "$TMP/scan_repo" "$TMP/results"
   assert_exit "summary completes with softened check" 0 "$LAST_EXIT"

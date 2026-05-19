@@ -25,9 +25,10 @@ on:
       skip-checks:
         description: >
           Comma-separated list of check IDs to skip.
-          Valid values: cicd-sec-01-flow, cicd-sec-03, cicd-sec-04,
-          cicd-sec-05-branch, cicd-sec-05-permissions, cicd-sec-05-runner-access,
-          cicd-sec-06, cicd-sec-07-runner-hardening, cicd-sec-08
+          Valid values: cicd-sec-01-flow, cicd-sec-03-dependency-chain,
+          cicd-sec-04-poisoned-pipeline, cicd-sec-05-branch, cicd-sec-05-permissions,
+          cicd-sec-05-runner-access, cicd-sec-06-secret-scan, cicd-sec-07-runner-hardening,
+          cicd-sec-08-action-pinning (legacy short IDs cicd-sec-03/04/06/08 still accepted)
         type: string
         default: ''
       guardrails-repository:
@@ -88,7 +89,7 @@ jobs:
       - name: Verify guardrails scripts are present
         run: |
           set -euo pipefail
-          SCRIPT="guardrails-probe/scripts/checks/domain/cicd_sec_03.sh"
+          SCRIPT="guardrails-probe/scripts/checks/domain/cicd_sec_03_dependency_chain.sh"
           if [[ ! -f "$SCRIPT" ]]; then
             echo "::error::Guardrails checkout at ${{ inputs.guardrails-ref }} does not contain expected scripts (missing ${SCRIPT})."
             echo "::error::Check guardrails-repository (${{ inputs.guardrails-repository }}), org Actions policy, and that the SHA matches your uses: pin."
@@ -101,11 +102,11 @@ jobs:
     name: '📊 Risk summary'
     needs:
       - setup
-      - cicd-sec-04
-      - cicd-sec-08
+      - cicd-sec-04-poisoned-pipeline
+      - cicd-sec-08-action-pinning
       - cicd-sec-05-permissions
-      - cicd-sec-03
-      - cicd-sec-06
+      - cicd-sec-03-dependency-chain
+      - cicd-sec-06-secret-scan
       - cicd-sec-01-flow
       - cicd-sec-05-branch
       - cicd-sec-05-runner-access
@@ -144,11 +145,11 @@ jobs:
       - name: Generate risk summary
         run: bash guardrails/scripts/aggregate_risk_summary.sh scan_repo guardrails-results
 
-  # ── CICD-SEC-04: pull_request_target ──────────────────────────────────────
-  cicd-sec-04:
-    name: '🧩 Code | 🚨 04 — pull request target trigger'
+  # ── CICD-SEC-04-POISONED-PIPELINE: pull_request_target ───────────────────
+  cicd-sec-04-poisoned-pipeline:
+    name: '🧩 Code | 🚨 04-poisoned-pipeline — Poisoned pipeline'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-04') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-04-poisoned-pipeline') && !contains(inputs.skip-checks, 'cicd-sec-04') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -165,7 +166,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_04.sh scan_repo
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh scan_repo
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -173,17 +174,17 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-cicd-sec-04
+          name: guardrails-results-cicd-sec-04-poisoned-pipeline
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # CICD-SEC-08 scans composite actions under actions/ only. Workflow YAML pinning
-  # under .github/workflows is covered by CICD-SEC-03 to avoid duplicate findings.
-  # ── CICD-SEC-08: Action SHA-Pinning (composite actions) ───────────────────
-  cicd-sec-08:
-    name: '🧩 Code | 📌 08 — Action SHA pinning'
+  # CICD-SEC-08-ACTION-PINNING scans composite actions under actions/ only. Workflow YAML pinning
+  # under .github/workflows is covered by CICD-SEC-03-DEPENDENCY-CHAIN to avoid duplicate findings.
+  # ── CICD-SEC-08-ACTION-PINNING: Action SHA-Pinning (composite actions) ──────
+  cicd-sec-08-action-pinning:
+    name: '🧩 Code | 📌 08-action-pinning — Action SHA pinning'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-08') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-08-action-pinning') && !contains(inputs.skip-checks, 'cicd-sec-08') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -198,7 +199,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_08.sh scan_repo
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_08_action_pinning.sh scan_repo
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -206,7 +207,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-cicd-sec-08
+          name: guardrails-results-cicd-sec-08-action-pinning
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
@@ -241,11 +242,11 @@ jobs:
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── CICD-SEC-03: Dependency Lock Files ────────────────────────────────────
-  cicd-sec-03:
-    name: '🧩 Code | 🔒 03 — Dependency lockfiles'
+  # ── CICD-SEC-03-DEPENDENCY-CHAIN: Dependency chain ────────────────────────
+  cicd-sec-03-dependency-chain:
+    name: '🧩 Code | 🔒 03-dependency-chain — Dependency chain'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-03') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-03-dependency-chain') && !contains(inputs.skip-checks, 'cicd-sec-03') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -260,7 +261,7 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - run: bash guardrails/scripts/checks/domain/cicd_sec_03.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
+      - run: bash guardrails/scripts/checks/domain/cicd_sec_03_dependency_chain.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -268,15 +269,15 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-cicd-sec-03
+          name: guardrails-results-cicd-sec-03-dependency-chain
           path: guardrails-results/*.json
           if-no-files-found: ignore
 
-  # ── CICD-SEC-06: Secret scanning ──────────────────────────────────────────
-  cicd-sec-06:
-    name: '🧩 Code | 🕵️ 06 — Secret scanning'
+  # ── CICD-SEC-06-SECRET-SCAN: Secret scanning ──────────────────────────────
+  cicd-sec-06-secret-scan:
+    name: '🧩 Code | 🕵️ 06-secret-scan — Secret scanning'
     needs: setup
-    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-06') }}
+    if: ${{ !contains(inputs.skip-checks, 'cicd-sec-06-secret-scan') && !contains(inputs.skip-checks, 'cicd-sec-06') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -303,7 +304,7 @@ jobs:
           tar xzf "$ARCHIVE" gitleaks
 
       - name: Scan for secrets
-        run: bash guardrails/scripts/checks/domain/cicd_sec_06.sh scan_repo
+        run: bash guardrails/scripts/checks/domain/cicd_sec_06_secret_scan.sh scan_repo
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
 
@@ -311,7 +312,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: guardrails-results-cicd-sec-06
+          name: guardrails-results-cicd-sec-06-secret-scan
           path: guardrails-results/*.json
           if-no-files-found: ignore
 

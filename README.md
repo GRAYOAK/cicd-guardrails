@@ -29,16 +29,16 @@ Die **Implementierung** (Skripte, Workflow-Definitionen, Hook-Metadaten) liegt a
 
 ### Lokaler Check
 
-**Voraussetzungen:** `bash`; `yq` empfohlen (mehrere Checks und `.guardrails.yml`); `CICD-SEC-06` benötigt `gitleaks` und `jq`; API-Checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) benötigen `GH_TOKEN` und `GITHUB_REPOSITORY`.
+**Voraussetzungen:** `bash`; `yq` empfohlen (mehrere Checks und `.guardrails.yml`); `CICD-SEC-06-SECRET-SCAN` benötigt `gitleaks` und `jq`; API-Checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) benötigen `GH_TOKEN` und `GITHUB_REPOSITORY`.
 
 1. Dieses Repository klonen und auf **dieselbe SHA** wie in CI/pre-commit auschecken: `git checkout <SHA>`.
 2. Einzelne Checks gegen das **Ziel-Repo** ausführen (Pfad = Repository-Root des Ziels):
 
 ```bash
-bash scripts/checks/domain/cicd_sec_04.sh                 /pfad/zum/ziel-repo
-bash scripts/checks/domain/cicd_sec_08.sh                 /pfad/zum/ziel-repo
-bash scripts/checks/domain/cicd_sec_05_permissions.sh     /pfad/zum/ziel-repo
-bash scripts/checks/domain/cicd_sec_03.sh                 /pfad/zum/ziel-repo
+bash scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh       /pfad/zum/ziel-repo
+bash scripts/checks/domain/cicd_sec_08_action_pinning.sh         /pfad/zum/ziel-repo
+bash scripts/checks/domain/cicd_sec_05_permissions.sh             /pfad/zum/ziel-repo
+bash scripts/checks/domain/cicd_sec_03_dependency_chain.sh        /pfad/zum/ziel-repo
 bash scripts/checks/domain/cicd_sec_05_runner_access.sh   /pfad/zum/ziel-repo
 bash scripts/checks/domain/cicd_sec_07_runner_hardening.sh /pfad/zum/ziel-repo
 GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo \
@@ -47,7 +47,7 @@ GH_TOKEN=<dein-token> GITHUB_REPOSITORY=owner/repo \
   bash scripts/checks/domain/cicd_sec_05_branch.sh /pfad/zum/ziel-repo
 ```
 
-**Maintainer** (Änderungen an Guardrails selbst): Regressionstests im Clone — siehe [Entwicklung an diesem Repository](#entwicklung-an-diesem-repository).
+**Maintainer** (Änderungen an Guardrails selbst): Regressionstests im Clone — siehe [Entwicklung an diesem Repository](#entwicklung-an-diesem-repository). Agent-orientierte Kurzreferenz: [`AGENTS.md`](AGENTS.md).
 
 ### Pre-commit Hook
 
@@ -59,13 +59,13 @@ repos:
   - repo: https://github.com/YOUR_ORG/cicd-guardrails
     rev: <SHA>   # dieselbe 40-Zeichen-SHA wie full-scan.yml@<SHA>
     hooks:
-      - id: cicd-sec-04
-      - id: cicd-sec-08
+      - id: cicd-sec-04-poisoned-pipeline
+      - id: cicd-sec-08-action-pinning
       - id: cicd-sec-05-permissions
       - id: cicd-sec-05-runner-access
       - id: cicd-sec-07-runner-hardening
-      - id: cicd-sec-03
-      - id: cicd-sec-06
+      - id: cicd-sec-03-dependency-chain
+      - id: cicd-sec-06-secret-scan
         stages: [manual]
 ```
 
@@ -115,14 +115,14 @@ Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designa
 | Designation | Job-ID | Skript | Scope | Was wird erkannt |
 |---|---|---|---|---|
 | `CICD-SEC-01-FLOW` | `cicd-sec-01-flow` | `scripts/checks/domain/cicd_sec_01_flow.sh` | Settings | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
-| `CICD-SEC-03` | `cicd-sec-03` | `scripts/checks/domain/cicd_sec_03.sh` | Code | Python: verzeichnisbasierte `package_policy` (Defaults im Repo + Overlay); andere Ökosysteme: Manifeste/Lockfiles; Workflow-`uses:`-SHA-Pins; Dockerfile-Digests; `find` im Skript |
-| `CICD-SEC-04` | `cicd-sec-04` | `scripts/checks/domain/cicd_sec_04.sh` | Code | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
+| `CICD-SEC-03-DEPENDENCY-CHAIN` | `cicd-sec-03-dependency-chain` | `scripts/checks/domain/cicd_sec_03_dependency_chain.sh` | Code | Python: verzeichnisbasierte `package_policy` (Defaults im Repo + Overlay); andere Ökosysteme: Manifeste/Lockfiles; Workflow-`uses:`-SHA-Pins; Dockerfile-Digests; `find` im Skript |
+| `CICD-SEC-04-POISONED-PIPELINE` | `cicd-sec-04-poisoned-pipeline` | `scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh` | Code | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
 | `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Code | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
 | `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Settings | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
 | `CICD-SEC-05-RUNNER-ACCESS` | `cicd-sec-05-runner-access` | `scripts/checks/domain/cicd_sec_05_runner_access.sh` | Code | Generische self-hosted Runner Labels ohne Segmentierung |
-| `CICD-SEC-06` | `cicd-sec-06` | `scripts/checks/domain/cicd_sec_06.sh` | Code | Hardcoded secrets via gitleaks; lists each hit as file, line, and rule (no secret values in logs) |
+| `CICD-SEC-06-SECRET-SCAN` | `cicd-sec-06-secret-scan` | `scripts/checks/domain/cicd_sec_06_secret_scan.sh` | Code | Hardcoded secrets via gitleaks; lists each hit as file, line, and rule (no secret values in logs) |
 | `CICD-SEC-07-RUNNER-HARDENING` | `cicd-sec-07-runner-hardening` | `scripts/checks/domain/cicd_sec_07_runner_hardening.sh` | Code | `--privileged` Container und `sudo` in Workflows |
-| `CICD-SEC-08` | `cicd-sec-08` | `scripts/checks/domain/cicd_sec_08.sh` | Code | Composite Actions unter `actions/` — gleiche Pin-Regeln wie Workflows in SEC-03 |
+| `CICD-SEC-08-ACTION-PINNING` | `cicd-sec-08-action-pinning` | `scripts/checks/domain/cicd_sec_08_action_pinning.sh` | Code | Composite Actions unter `actions/` — gleiche Pin-Regeln wie Workflows in SEC-03-DEPENDENCY-CHAIN |
 
 ### Check-Ausgabe: Scan coverage
 
@@ -188,11 +188,11 @@ GitHub → Repo Settings → Branches → Add rule → `main`:
 - ✅ Require status checks to pass before merging
 - ✅ Require branches to be up to date before merging
 - Required status checks (Display-Namen exakt so eintragen):
-  - `🧩 Code | 🚨 04 — pull request target trigger`
-  - `🧩 Code | 📌 08 — Action SHA pinning`
+  - `🧩 Code | 🚨 04-poisoned-pipeline — Poisoned pipeline`
+  - `🧩 Code | 📌 08-action-pinning — Action SHA pinning`
   - `🧩 Code | 🔐 05-permissions — Workflow permissions`
-  - `🧩 Code | 🔒 03 — Dependency lockfiles`
-  - `🧩 Code | 🕵️ 06 — Secret scanning`
+  - `🧩 Code | 🔒 03-dependency-chain — Dependency chain`
+  - `🧩 Code | 🕵️ 06-secret-scan — Secret scanning`
   - `🧩 Code | 🖥️ 05-runner-access — Runner access`
   - `🧩 Code | 🧱 07-runner-hardening — Runner hardening`
   - `⚙️ Settings | 🧭 01-flow — Flow control` ← nur mit Admin-Token sinnvoll
@@ -211,7 +211,7 @@ jobs:
     uses: YOUR_ORG/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
     with:
       strict: false
-      skip-checks: 'cicd-sec-06,cicd-sec-07-runner-hardening'
+      skip-checks: 'cicd-sec-06-secret-scan,cicd-sec-07-runner-hardening'
 ```
 
 **Repo-seitig** über `.guardrails.yml` – einzelne Checks auf `warn` oder `off` schalten, ohne den Caller anzufassen. Siehe Abschnitt _Pro-Check Severity-Override_.
@@ -241,17 +241,17 @@ context:
 
 Wie die Werte einfließen:
 
-- `visibility=public` erhöht Risiko-Gewichtung für `CICD-SEC-04`, `CICD-SEC-06`, `CICD-SEC-08`
+- `visibility=public` erhöht Risiko-Gewichtung für `CICD-SEC-04-POISONED-PIPELINE`, `CICD-SEC-06-SECRET-SCAN`, `CICD-SEC-08-ACTION-PINNING`
 - `software_type=open_source` gewichtet Supply-Chain/Exposure höher
 - `runner_type=self_hosted` gewichtet Runner-Access- und Hardening-Themen höher
-- `container_registry=public` erhöht Supply-Chain-Gewichtung (vor allem `CICD-SEC-08` und Workflow-Pins in `CICD-SEC-03`, dann `CICD-SEC-06` und `CICD-SEC-04`); `private_network` reduziert sie geringfügig
+- `container_registry=public` erhöht Supply-Chain-Gewichtung (vor allem `CICD-SEC-08-ACTION-PINNING` und Workflow-Pins in `CICD-SEC-03-DEPENDENCY-CHAIN`, dann `CICD-SEC-06-SECRET-SCAN` und `CICD-SEC-04-POISONED-PIPELINE`); `private_network` reduziert sie geringfügig
 - `data_sensitivity=high` und `deployment_criticality=prod|regulated` erhöhen Priorität für Secrets, Permissions und Runner-Kontrollen
 
 Fehlt die Datei, nutzt Guardrails konservative Defaults und schreibt das transparent ins Summary.
 
 #### Optional: Dateiscan-Overlay (`.guardrails.file-patterns.yml`)
 
-Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03` leben in den Skripten; Consumer-Repos **müssen** keine Kopie pflegen. Optional kann das Ziel-Repo **zusätzliche** Einträge setzen:
+Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03-DEPENDENCY-CHAIN` leben in den Skripten; Consumer-Repos **müssen** keine Kopie pflegen. Optional kann das Ziel-Repo **zusätzliche** Einträge setzen:
 
 - `global_excludes` — weitere `find -not -path` Muster (additiv zu den Defaults)
 - `validation_skip_paths` — relative Pfade, die zwar gefunden, aber **ohne** Manifest-/Lock-Policy geprüft werden (sinnvoll für reine Tooling-`pyproject.toml`-Verzeichnisse)
@@ -321,11 +321,11 @@ Für graduelles Ausrollen kann jeder Check pro Repository auf einen anderen Modu
 ```yaml
 # .guardrails.yml
 checks:
-  CICD-SEC-08:
+  CICD-SEC-08-ACTION-PINNING:
     mode: warn                # action pinning vorerst nur als Warnung
   CICD-SEC-07-RUNNER-HARDENING:
     mode: warn                # privileged container schrittweise rauspatchen
-  CICD-SEC-06:
+  CICD-SEC-06-SECRET-SCAN:
     mode: fail                # Secrets bleiben hart
 ```
 
@@ -380,21 +380,21 @@ cicd-guardrails/
 │   ├── checks/
 │   │   ├── domain/                       # Fachliche Startpunkte (cicd_sec_*)
 │   │   │   ├── cicd_sec_01_flow.sh
-│   │   │   ├── cicd_sec_03.sh
-│   │   │   ├── package/                  # Sprachmodule fuer CICD-SEC-03 (JS/Go/Rust/Ruby/PHP; Python Logik)
+│   │   │   ├── cicd_sec_03_dependency_chain.sh
+│   │   │   ├── package/                  # Sprachmodule fuer CICD-SEC-03-DEPENDENCY-CHAIN (JS/Go/Rust/Ruby/PHP; Python Logik)
 │   │   │   │   ├── js_ts.sh
 │   │   │   │   ├── python.sh
 │   │   │   │   ├── go.sh
 │   │   │   │   ├── rust.sh
 │   │   │   │   ├── ruby.sh
 │   │   │   │   └── php.sh
-│   │   │   ├── cicd_sec_04.sh
+│   │   │   ├── cicd_sec_04_poisoned_pipeline.sh
 │   │   │   ├── cicd_sec_05_branch.sh
 │   │   │   ├── cicd_sec_05_permissions.sh
 │   │   │   ├── cicd_sec_05_runner_access.sh
-│   │   │   ├── cicd_sec_06.sh
+│   │   │   ├── cicd_sec_06_secret_scan.sh
 │   │   │   ├── cicd_sec_07_runner_hardening.sh
-│   │   │   └── cicd_sec_08.sh
+│   │   │   └── cicd_sec_08_action_pinning.sh
 │   │   └── tech/                         # Technische Adapter (API/Parsing/CLI)
 │   │       ├── github_branch_protection_api.sh
 │   │       └── workflow_runner_scan.sh
@@ -429,16 +429,16 @@ bash tests/test_checks.sh
 Einzelne Checks mit Ziel `.` (Repository-Root von Guardrails), aus dem Guardrails-Clone:
 
 ```bash
-bash scripts/checks/domain/cicd_sec_04.sh .
-bash scripts/checks/domain/cicd_sec_08.sh .
+bash scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh .
+bash scripts/checks/domain/cicd_sec_08_action_pinning.sh .
 # … weitere Checks wie im Quick Start, Pfad . statt /pfad/zum/ziel-repo
 ```
 
 In CI prüft [`.github/workflows/self-test.yml`](.github/workflows/self-test.yml) ausgewählte Checks auf diesem Repo.
 
-### Modular package check architecture (`CICD-SEC-03`)
+### Modular package check architecture (`CICD-SEC-03-DEPENDENCY-CHAIN`)
 
-`CICD-SEC-03` behält seine öffentliche Designation und Workflow-Anbindung, nutzt intern aber ein Dispatcher-Muster. Das Top-Level-Skript orchestriert Sprachmodule mit stabiler Schnittstelle:
+`CICD-SEC-03-DEPENDENCY-CHAIN` behält seine öffentliche Designation und Workflow-Anbindung, nutzt intern aber ein Dispatcher-Muster. Das Top-Level-Skript orchestriert Sprachmodule mit stabiler Schnittstelle:
 
 - input: repository root path
 - output: findings via shared reporting library
@@ -476,7 +476,7 @@ updates:
 
 **Version pinnen:** Siehe [Quick Start](#quick-start) — für CI, pre-commit und lokale Skripte aus einem Clone dieselbe Commit-SHA verwenden; nie ungepinnte Branch-Referenzen als einzige Quelle.
 
-**gitleaks SHA:** Der `cicd-sec-06` Job lädt gitleaks herunter. Den Versions-Pin in `full-scan.yml` ggf. an die aktuelle Release ([gitleaks Releases](https://github.com/gitleaks/gitleaks/releases)) anpassen.
+**gitleaks SHA:** Der `cicd-sec-06-secret-scan` Job lädt gitleaks herunter. Den Versions-Pin in `full-scan.yml` ggf. an die aktuelle Release ([gitleaks Releases](https://github.com/gitleaks/gitleaks/releases)) anpassen.
 
 **GITHUB_WORKFLOW_REF:** Die Workflows parsen `GITHUB_WORKFLOW_REF` um den exakten Guardrails-SHA zu ermitteln – Skripte werden immer in der Version geladen die zum aufgerufenen Workflow passt.
 

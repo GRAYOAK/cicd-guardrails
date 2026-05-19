@@ -1,15 +1,15 @@
-- id: cicd-sec-04
-  name: CICD-SEC-04 (pull_request_target)
+- id: cicd-sec-04-poisoned-pipeline
+  name: CICD-SEC-04-POISONED-PIPELINE (pull_request_target)
   description: Detects pull_request_target usage in workflow files.
-  entry: scripts/checks/domain/cicd_sec_04.sh .
+  entry: scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh .
   language: script
   pass_filenames: false
   files: ^\.github/workflows/.*\.(yml|yaml)$
 
-- id: cicd-sec-08
-  name: CICD-SEC-08 (Action SHA-Pinning)
+- id: cicd-sec-08-action-pinning
+  name: CICD-SEC-08-ACTION-PINNING (Action SHA-Pinning)
   description: Detects mutable third-party action references.
-  entry: scripts/checks/domain/cicd_sec_08.sh .
+  entry: scripts/checks/domain/cicd_sec_08_action_pinning.sh .
   language: script
   pass_filenames: false
   files: ^actions/.*/action\.(yml|yaml)$
@@ -38,18 +38,18 @@
   pass_filenames: false
   files: ^\.github/workflows/.*\.(yml|yaml)$
 
-- id: cicd-sec-03
-  name: CICD-SEC-03 (Dependency lock files)
-  description: Ensures lock files and pinned dependencies are present.
-  entry: scripts/checks/domain/cicd_sec_03.sh .
+- id: cicd-sec-03-dependency-chain
+  name: CICD-SEC-03-DEPENDENCY-CHAIN (Dependency chain)
+  description: Ensures lock files, pinned dependencies, workflow SHAs, and Dockerfile digests.
+  entry: scripts/checks/domain/cicd_sec_03_dependency_chain.sh .
   language: script
   pass_filenames: false
   files: (^|.*/)(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|pyproject\.toml|requirements[^/]*\.txt|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|composer\.json|composer\.lock|Dockerfile[^/]*|\.github/workflows/.*\.(yml|yaml))$
 
-- id: cicd-sec-06
-  name: CICD-SEC-06 (Secret scanning)
+- id: cicd-sec-06-secret-scan
+  name: CICD-SEC-06-SECRET-SCAN (Secret scanning)
   description: Runs secret scanning manually when gitleaks is available.
-  entry: scripts/checks/domain/cicd_sec_06.sh .
+  entry: scripts/checks/domain/cicd_sec_06_secret_scan.sh .
   language: script
   pass_filenames: false
   stages: [manual]

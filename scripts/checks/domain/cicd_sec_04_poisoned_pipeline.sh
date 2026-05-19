@@ -12,7 +12,7 @@ source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
 PATH_ROOT="${1:-.}"
 WORKFLOWS_DIR="${PATH_ROOT}/.github/workflows"
 
-fb_init "CICD-SEC-04" "pull_request_target check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution/"
+fb_init "CICD-SEC-04-POISONED-PIPELINE" "Poisoned pipeline check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution/"
 cfg_init "$PATH_ROOT"
 fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
 fb_add_searched "Workflow files under ${WORKFLOWS_DIR}"

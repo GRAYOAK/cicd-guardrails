@@ -59,14 +59,14 @@
       "description": "Optional per-check severity overrides. Default mode is 'fail'. Use 'warn' or 'off' for staged rollout.",
       "properties": {
         "CICD-SEC-01-FLOW": { "$ref": "#/$defs/checkOverride" },
-        "CICD-SEC-03": { "$ref": "#/$defs/checkOverride" },
-        "CICD-SEC-04": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-03-DEPENDENCY-CHAIN": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-04-POISONED-PIPELINE": { "$ref": "#/$defs/checkOverride" },
         "CICD-SEC-05-PERMISSIONS": { "$ref": "#/$defs/checkOverride" },
         "CICD-SEC-05-BRANCH": { "$ref": "#/$defs/checkOverride" },
         "CICD-SEC-05-RUNNER-ACCESS": { "$ref": "#/$defs/checkOverride" },
-        "CICD-SEC-06": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-06-SECRET-SCAN": { "$ref": "#/$defs/checkOverride" },
         "CICD-SEC-07-RUNNER-HARDENING": { "$ref": "#/$defs/checkOverride" },
-        "CICD-SEC-08": { "$ref": "#/$defs/checkOverride" }
+        "CICD-SEC-08-ACTION-PINNING": { "$ref": "#/$defs/checkOverride" }
       }
     }
   },

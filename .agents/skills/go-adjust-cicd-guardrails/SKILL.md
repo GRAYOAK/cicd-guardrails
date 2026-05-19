@@ -9,14 +9,14 @@ disable-model-invocation: true
 ## Scope
 
 Use this skill for changes in:
-- `scripts/checks/domain/cicd_sec_*.sh` (domain checks)
-- `scripts/checks/domain/package/*.sh` (CICD-SEC-03 ecosystem audits)
+- `scripts/checks/domain/cicd_sec_*.sh` (domain checks; every script must include a purpose slug, e.g. `cicd_sec_03_dependency_chain.sh`)
+- `scripts/checks/domain/package/*.sh` (CICD-SEC-03-DEPENDENCY-CHAIN ecosystem audits)
 - `scripts/checks/tech/*.sh` (technical adapters)
 - `scripts/lib/feedback.sh`
 - `scripts/lib/config.sh`
 - `scripts/lib/file_patterns.sh`
 - `scripts/lib/package_policy.sh`
-- `scripts/config/package_policy.defaults.yml` (shipped Python CICD-SEC-03 defaults merged with overlay `package_policy.python`)
+- `scripts/config/package_policy.defaults.yml` (shipped Python CICD-SEC-03-DEPENDENCY-CHAIN defaults merged with overlay `package_policy.python`)
 - `scripts/lib/action_pin_audit.sh`
 - `scripts/lib/dockerfile_pin_audit.sh`
 - `scripts/aggregate_risk_summary.sh`
@@ -55,7 +55,7 @@ Use this skill for changes in:
 
 The OWASP designation is the identity for every check. Keep all four layers in sync when adding or renaming checks:
 
-- **Skript filename**: `scripts/checks/domain/cicd_sec_<NR>[_<aspect>].sh` in snake_case lowercase (e.g. `cicd_sec_05_runner_access.sh`).
+- **Skript filename**: `scripts/checks/domain/cicd_sec_<NR>_<purpose_slug>.sh` in snake_case lowercase (e.g. `cicd_sec_05_runner_access.sh`, `cicd_sec_03_dependency_chain.sh`). Bare `cicd_sec_<NR>.sh` without a purpose slug is not allowed for new or renamed checks.
 - **Workflow job ID**: kebab-case mirror of the filename (e.g. `cicd-sec-05-runner-access`). Used by `skip-checks` input.
 - **Display name**: GitHub job `name:` in the Actions UI. Use a **scope emoji** (`🧩` = Code / checkout content, `⚙️` = Settings / GitHub API policy), then the text `Code |` or `Settings |`, then a **theme emoji** for the check topic, compact slug, and short title — e.g. `'🧩 Code | 🖥️ 05-runner-access — Runner access'` or `'⚙️ Settings | 🧭 01-flow — Flow control'`. The OWASP designation stays in `FB_CHECK_ID` and JSON, not necessarily in the display string verbatim.
 - **FB_CHECK_ID**: the designation in upper case, identical to the keys allowed in `.guardrails.yml` `checks:` block (e.g. `CICD-SEC-05-RUNNER-ACCESS`).

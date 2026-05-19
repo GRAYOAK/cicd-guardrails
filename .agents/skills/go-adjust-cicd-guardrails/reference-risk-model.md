@@ -35,7 +35,7 @@ context:
   deployment_criticality: prod    # dev | prod | regulated
 
 checks:                           # optional, per-check severity override
-  CICD-SEC-08:
+  CICD-SEC-08-ACTION-PINNING:
     mode: warn                    # fail (default) | warn | off
 ```
 
