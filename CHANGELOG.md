@@ -11,6 +11,20 @@ This file is maintained automatically by [release-please](https://github.com/goo
 For breaking-change migration steps targeted at automated consumers (including AI agents), see the
 companion file `migrations/v<X.Y.Z>.md` released alongside each version.
 
+## [0.4.0](https://github.com/GRAYOAK/cicd-guardrails/compare/v0.3.2...v0.4.0) (2026-05-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* resolve migration conflict; move scan_repo notes to v0.3.3
+* full-scan.yml uses path scan_repo; consumers must pin a new SHA or update forked workflows. See migrations/v0.3.2.md.
+
+### Bug Fixes
+
+* gitleaks version bug ([aaf3fef](https://github.com/GRAYOAK/cicd-guardrails/commit/aaf3fef8d6a2aaaf6953067450b371b1ac5b0bdb))
+* rename caller checkout path from target to scan_repo ([1d30dc9](https://github.com/GRAYOAK/cicd-guardrails/commit/1d30dc9ba0aae390a1fbc44b1c559c4cf300b074))
+* resolve migration conflict; move scan_repo notes to v0.3.3 ([9e402dc](https://github.com/GRAYOAK/cicd-guardrails/commit/9e402dc089b0a67c3691aba7f201e71bbec34b58))
+
 ## [0.3.2](https://github.com/GRAYOAK/cicd-guardrails/compare/v0.3.1...v0.3.2) (2026-05-16)
 
 
