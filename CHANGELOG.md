@@ -11,6 +11,17 @@ This file is maintained automatically by [release-please](https://github.com/goo
 For breaking-change migration steps targeted at automated consumers (including AI agents), see the
 companion file `migrations/v<X.Y.Z>.md` released alongside each version.
 
+## [0.5.0](https://github.com/GRAYOAK/cicd-guardrails/compare/v0.4.0...v0.5.0) (2026-05-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* add purpose slugs to SEC-03/04/06/08 check designations
+
+### Features
+
+* add purpose slugs to SEC-03/04/06/08 check designations ([fd1178b](https://github.com/GRAYOAK/cicd-guardrails/commit/fd1178b08b2ca5f32c8e9852931684f18ffd1670))
+
 ## [0.4.0](https://github.com/GRAYOAK/cicd-guardrails/compare/v0.3.2...v0.4.0) (2026-05-19)
 
 
