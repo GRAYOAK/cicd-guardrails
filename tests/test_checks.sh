@@ -499,6 +499,101 @@ assert_exit "reports branch policy findings with deterministic designation" 1 "$
 assert_output_contains "uses SEC-05 branch designation" "CICD-SEC-05-BRANCH"
 teardown
 
+echo ""
+echo "▶ cicd_sec_06.sh reports structured gitleaks findings"
+setup
+git -C "$TMP" init -q
+git -C "$TMP" config user.email "guardrails@test.invalid"
+git -C "$TMP" config user.name "guardrails-test"
+echo "fixture" > "$TMP/readme.md"
+git -C "$TMP" add readme.md
+git -C "$TMP" commit -q -m "init"
+cat > "$TMP/gitleaks" <<'EOF'
+#!/usr/bin/env bash
+report_path=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --report-path) report_path="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+if [[ -n "$report_path" ]]; then
+  cat >"$report_path" <<'JSON'
+[
+  {
+    "RuleID": "generic-api-key",
+    "File": "config/app.env",
+    "StartLine": 3,
+    "Commit": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+  },
+  {
+    "RuleID": "jwt",
+    "File": "config/app.env",
+    "StartLine": 3,
+    "Commit": "cafebabecafebabecafebabecafebabecafebabe"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "config/app.env",
+    "StartLine": 3,
+    "Commit": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeed"
+  }
+]
+JSON
+fi
+exit 1
+EOF
+chmod +x "$TMP/gitleaks"
+pushd "$TMP" >/dev/null
+run_check "$DOMAIN_DIR/cicd_sec_06.sh" .
+popd >/dev/null
+assert_exit "leaks fail in default fail mode" 1 "$LAST_EXIT"
+assert_output_contains "lists file line and rule in Found" "[error] config/app.env:3"
+assert_output_contains "lists gitleaks rule id" 'gitleaks rule "generic-api-key"'
+assert_output_contains "lists second rule on same line" 'gitleaks rule "jwt"'
+if [[ "$(printf '%s' "$LAST_OUTPUT" | grep -c 'config/app.env:3')" -eq 2 ]]; then
+  echo "  ✅ dedupes findings per file line and rule"
+  PASS=$((PASS + 1))
+else
+  echo "  ❌ dedupes findings per file line and rule (expected 2 lines, got $(printf '%s' "$LAST_OUTPUT" | grep -c 'config/app.env:3' || true))"
+  FAIL=$((FAIL + 1))
+fi
+teardown
+
+if command -v yq >/dev/null 2>&1; then
+  echo ""
+  echo "▶ cicd_sec_06.sh with mode=warn"
+  setup
+  git -C "$TMP" init -q
+  git -C "$TMP" config user.email "guardrails@test.invalid"
+  git -C "$TMP" config user.name "guardrails-test"
+  echo "fixture" > "$TMP/readme.md"
+  git -C "$TMP" add readme.md
+  git -C "$TMP" commit -q -m "init"
+  cat > "$TMP/gitleaks" <<'EOF'
+#!/usr/bin/env bash
+report_path=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --report-path) report_path="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+[[ -n "$report_path" ]] && printf '%s\n' '[{"RuleID":"generic-api-key","File":"secrets.env","StartLine":1,"Commit":"abc12345"}]' >"$report_path"
+exit 1
+EOF
+  chmod +x "$TMP/gitleaks"
+  write_guardrails_yml "$TMP" "warn" "CICD-SEC-06"
+  pushd "$TMP" >/dev/null
+  run_check "$DOMAIN_DIR/cicd_sec_06.sh" .
+  popd >/dev/null
+  assert_exit "warn override keeps job green" 0 "$LAST_EXIT"
+  assert_output_contains "renders Mode warn" "Mode: **warn**"
+  assert_output_contains "renders WARN status" "Status: **WARN**"
+  assert_output_contains "still lists finding detail" "secrets.env:1"
+  teardown
+fi
+
 # ── Per-check severity override (mode warn / off) ─────────────────────────
 if command -v yq >/dev/null 2>&1; then
   echo ""

@@ -9,7 +9,7 @@ Downstream jobs (for example risk aggregation) read one JSON file per check. The
 ## Top-level fields
 
 - `check_id`, `title`, `status`, `mode`, `counts` (errors, warnings, notices), `owasp_reference`: stable identifiers and summary metadata.
-- `finding_detail_markdown`: grouped finding text when the check recorded structured rows (may be empty). Truncated before write when very large.
+- `finding_detail_markdown`: grouped finding text when the check recorded structured rows (may be empty). Truncated before write when very large. `CICD-SEC-06` fills this via `fb_report` rows with ecosystem `gitleaks` (RuleID, path, line, short commit prefix only).
 - `scan_coverage_markdown`: factual evidence of what was evaluated (may be empty). Same truncation policy as the job summary block for this field.
 
 ## Human summary sections (order)

@@ -29,7 +29,7 @@ Die **Implementierung** (Skripte, Workflow-Definitionen, Hook-Metadaten) liegt a
 
 ### Lokaler Check
 
-**Voraussetzungen:** `bash`; `yq` empfohlen (mehrere Checks und `.guardrails.yml`); optional `gitleaks` für `CICD-SEC-06`; API-Checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) benötigen `GH_TOKEN` und `GITHUB_REPOSITORY`.
+**Voraussetzungen:** `bash`; `yq` empfohlen (mehrere Checks und `.guardrails.yml`); `CICD-SEC-06` benötigt `gitleaks` und `jq`; API-Checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) benötigen `GH_TOKEN` und `GITHUB_REPOSITORY`.
 
 1. Dieses Repository klonen und auf **dieselbe SHA** wie in CI/pre-commit auschecken: `git checkout <SHA>`.
 2. Einzelne Checks gegen das **Ziel-Repo** ausführen (Pfad = Repository-Root des Ziels):
@@ -120,7 +120,7 @@ Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designa
 | `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Code | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
 | `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Settings | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
 | `CICD-SEC-05-RUNNER-ACCESS` | `cicd-sec-05-runner-access` | `scripts/checks/domain/cicd_sec_05_runner_access.sh` | Code | Generische self-hosted Runner Labels ohne Segmentierung |
-| `CICD-SEC-06` | `cicd-sec-06` | `scripts/checks/domain/cicd_sec_06.sh` | Code | Hardcoded Secrets via gitleaks |
+| `CICD-SEC-06` | `cicd-sec-06` | `scripts/checks/domain/cicd_sec_06.sh` | Code | Hardcoded secrets via gitleaks; lists each hit as file, line, and rule (no secret values in logs) |
 | `CICD-SEC-07-RUNNER-HARDENING` | `cicd-sec-07-runner-hardening` | `scripts/checks/domain/cicd_sec_07_runner_hardening.sh` | Code | `--privileged` Container und `sudo` in Workflows |
 | `CICD-SEC-08` | `cicd-sec-08` | `scripts/checks/domain/cicd_sec_08.sh` | Code | Composite Actions unter `actions/` — gleiche Pin-Regeln wie Workflows in SEC-03 |
 
