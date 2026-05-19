@@ -39,6 +39,17 @@ cfg_context() {
   fi
 }
 
+cfg__resolve_check_id() {
+  local check_id="$1"
+  case "$check_id" in
+    CICD-SEC-03) echo "CICD-SEC-03-DEPENDENCY-CHAIN" ;;
+    CICD-SEC-04) echo "CICD-SEC-04-POISONED-PIPELINE" ;;
+    CICD-SEC-06) echo "CICD-SEC-06-SECRET-SCAN" ;;
+    CICD-SEC-08) echo "CICD-SEC-08-ACTION-PINNING" ;;
+    *) echo "$check_id" ;;
+  esac
+}
+
 cfg_check_mode() {
   local check_id="$1"
   local default="fail"
@@ -47,6 +58,8 @@ cfg_check_mode() {
     echo "$default"
     return 0
   fi
+
+  check_id="$(cfg__resolve_check_id "$check_id")"
 
   if ! cfg__file_available || ! cfg__yq_available; then
     echo "$default"

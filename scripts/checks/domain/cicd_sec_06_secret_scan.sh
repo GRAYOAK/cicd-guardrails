@@ -12,7 +12,7 @@ source "${ROOT_SCRIPTS_DIR}/lib/config.sh"
 PATH_ROOT="${1:-.}"
 SEC06_REMEDIATION="Remove secrets from git history and replace with secure secret management."
 
-fb_init "CICD-SEC-06" "Secret scanning check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-06-Insufficient-Credential-Hygiene/"
+fb_init "CICD-SEC-06-SECRET-SCAN" "Secret scan check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-06-Insufficient-Credential-Hygiene/"
 cfg_init "$PATH_ROOT"
 fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
 fb_add_searched "Repository source history and files for leaked secrets"

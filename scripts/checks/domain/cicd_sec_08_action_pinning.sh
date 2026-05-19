@@ -16,7 +16,7 @@ source "${ROOT_SCRIPTS_DIR}/lib/action_pin_audit.sh"
 PATH_ROOT_ARG="${1:-.}"
 PATH_ROOT="$(cd "$PATH_ROOT_ARG" && pwd)"
 
-fb_init "CICD-SEC-08" "Action pinning check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"
+fb_init "CICD-SEC-08-ACTION-PINNING" "Action pinning check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-08-Ungoverned-Usage-of-3rd-Party-Services/"
 cfg_init "$PATH_ROOT"
 fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
 

@@ -14,7 +14,7 @@ context:
 #   warn = report findings, keep job green (migration mode)
 #   off  = skip the check entirely (use sparingly)
 checks:
-  CICD-SEC-06:
+  CICD-SEC-06-SECRET-SCAN:
     mode: fail
-  CICD-SEC-08:
+  CICD-SEC-08-ACTION-PINNING:
     mode: warn

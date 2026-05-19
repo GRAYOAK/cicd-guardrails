@@ -39,7 +39,7 @@ if [[ "${2:-}" == "--strict" ]]; then
   STRICT_MODE="true"
 fi
 
-fb_init "CICD-SEC-03" "Dependency pinning and lockfile check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse/"
+fb_init "CICD-SEC-03-DEPENDENCY-CHAIN" "Dependency chain check" "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse/"
 cfg_init "$PATH_ROOT"
 fb_set_mode "$(cfg_check_mode "$FB_CHECK_ID")"
 
