@@ -167,7 +167,7 @@ jobs:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
         id: app-token
         with:
-          app-id: ${{ secrets.APP_ID }}
+          client-id: ${{ secrets.CLIENT_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
   guardrails:
@@ -285,7 +285,7 @@ Voraussetzungen:
    - **Issues**: Read and write
 2. App auf **cicd-guardrails** installieren.
 3. Org-Secrets (für dieses Repo sichtbar):
-   - **`APP_ID`** — numerische App-ID
+   - **`CLIENT_ID`** — OAuth Client ID der GitHub App (App-Einstellungen, nicht die numerische App-ID)
    - **`APP_PRIVATE_KEY`** — vollständiger PEM-Inhalt des Private Keys
 
 Der Job `assemble-migration` pusht nach einem Release ggf. Migration-Notes auf `main`; bei Branch Protection den App-Bot in die Bypass-Liste aufnehmen.

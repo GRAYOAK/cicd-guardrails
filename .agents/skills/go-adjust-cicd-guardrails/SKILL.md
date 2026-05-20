@@ -75,7 +75,7 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
 - Keep caller-repository checkout explicit (`path: scan_repo`) for context-aware checks so `.guardrails.yml` is read from a deterministic location and not from guardrails source checkout paths. Do not use `target` as the checkout folder name: the built-in `find` exclude `*/target/*` (Rust build artifacts) would exclude the entire consumer tree.
 - Keep aggregator match-order explicit (specific designation clauses before family catch-alls) so scoring and remediation text remain deterministic when new sub-designations are introduced.
 - Keep reusable-workflow secret contracts explicit and stable: a caller may only pass secrets that are declared under `on.workflow_call.secrets` in the referenced workflow.
-- When a repository uses GitHub App credentials (`APP_ID`, `APP_PRIVATE_KEY`), mint a short-lived token in the caller workflow and pass only the resulting token (for example as `admin-token`) to the reusable workflow.
+- When a repository uses GitHub App credentials (`CLIENT_ID`, `APP_PRIVATE_KEY`), mint a short-lived token in the caller workflow and pass only the resulting token (for example as `admin-token`) to the reusable workflow.
 
 ## Required workflow for changes
 

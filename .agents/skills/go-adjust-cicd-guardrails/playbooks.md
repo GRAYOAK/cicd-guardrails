@@ -45,5 +45,5 @@ When changes affect reusable workflow usage in `cicd-demo-errors`:
 5. Ensure consumer `.guardrails.yml` keeps the `yaml-language-server` schema header.
 6. Keep secret contracts aligned with the reusable workflow declaration:
    - only pass secrets that the called workflow declares in `on.workflow_call.secrets`
-   - if the consumer stores GitHub App credentials (`APP_ID`, `APP_PRIVATE_KEY`), mint a token in a dedicated caller job and pass the token as `admin-token` to the reusable workflow
+   - if the consumer stores GitHub App credentials (`CLIENT_ID`, `APP_PRIVATE_KEY`), mint a token in a dedicated caller job and pass the token as `admin-token` to the reusable workflow
    - avoid passing raw app credentials directly to reusable workflows unless those exact keys are declared there
