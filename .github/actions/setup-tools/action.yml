@@ -1,0 +1,123 @@
+name: Setup Guardrails tools
+description: Validate the checked-out Guardrails source and provision pinned tools.
+
+inputs:
+  required-script:
+    description: Repository-relative Guardrails script required by the calling job.
+    required: true
+  install-yq:
+    description: Install the pinned yq binary.
+    required: false
+    default: 'true'
+  install-gitleaks:
+    description: Install the pinned gitleaks binary in the workspace.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate required Guardrails script
+      shell: bash
+      env:
+        REQUIRED_SCRIPT: ${{ inputs.required-script }}
+      run: |
+        set -euo pipefail
+        script_path="${GITHUB_WORKSPACE}/${REQUIRED_SCRIPT}"
+        if [[ ! -f "$script_path" ]]; then
+          echo "::error::Guardrails checkout is missing required script: ${REQUIRED_SCRIPT}"
+          exit 1
+        fi
+
+    - name: Resolve versioned tool paths
+      id: tool-paths
+      shell: bash
+      run: |
+        set -euo pipefail
+        tool_root="${RUNNER_TOOL_CACHE}/guardrails"
+        echo "yq=${tool_root}/yq/4.45.1/x64" >>"$GITHUB_OUTPUT"
+        echo "gitleaks=${tool_root}/gitleaks/8.21.2/x64" >>"$GITHUB_OUTPUT"
+
+    - name: Restore pinned yq
+      id: cache-yq
+      if: ${{ inputs.install-yq == 'true' }}
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.tool-paths.outputs.yq }}
+        key: guardrails-${{ runner.os }}-${{ runner.arch }}-yq-4.45.1-linux-amd64
+
+    - name: Install pinned yq
+      if: ${{ inputs.install-yq == 'true' && steps.cache-yq.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        TOOL_PATH: ${{ steps.tool-paths.outputs.yq }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$TOOL_PATH"
+        curl --fail --silent --show-error --location --retry 3 \
+          --output "${TOOL_PATH}/yq" \
+          "https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64"
+        chmod 0755 "${TOOL_PATH}/yq"
+
+    - name: Add yq to PATH
+      if: ${{ inputs.install-yq == 'true' }}
+      shell: bash
+      env:
+        TOOL_PATH: ${{ steps.tool-paths.outputs.yq }}
+      run: |
+        set -euo pipefail
+        "${TOOL_PATH}/yq" --version
+        echo "$TOOL_PATH" >>"$GITHUB_PATH"
+
+    - name: Restore pinned gitleaks
+      id: cache-gitleaks
+      if: ${{ inputs.install-gitleaks == 'true' }}
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.tool-paths.outputs.gitleaks }}
+        key: guardrails-${{ runner.os }}-${{ runner.arch }}-gitleaks-8.21.2-linux-x64
+
+    - name: Install and verify pinned gitleaks
+      if: ${{ inputs.install-gitleaks == 'true' && steps.cache-gitleaks.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        TOOL_PATH: ${{ steps.tool-paths.outputs.gitleaks }}
+      run: |
+        set -euo pipefail
+        version="8.21.2"
+        archive="gitleaks_${version}_linux_x64.tar.gz"
+        base="https://github.com/gitleaks/gitleaks/releases/download/v${version}"
+        temp_dir="$(mktemp -d)"
+        trap 'rm -rf "$temp_dir"' EXIT
+        curl --fail --silent --show-error --location --retry 3 \
+          --output "${temp_dir}/${archive}" "${base}/${archive}"
+        curl --fail --silent --show-error --location --retry 3 \
+          --output "${temp_dir}/checksums.txt" "${base}/gitleaks_${version}_checksums.txt"
+        (
+          cd "$temp_dir"
+          awk -v archive="$archive" '$2 == archive { print; found = 1 } END { if (!found) exit 1 }' checksums.txt \
+            | sha256sum -c -
+        )
+        mkdir -p "$TOOL_PATH"
+        tar -xzf "${temp_dir}/${archive}" -C "$TOOL_PATH" gitleaks
+        chmod 0755 "${TOOL_PATH}/gitleaks"
+        (
+          cd "$TOOL_PATH"
+          sha256sum gitleaks >gitleaks.sha256
+        )
+
+    - name: Expose gitleaks to the check
+      if: ${{ inputs.install-gitleaks == 'true' }}
+      shell: bash
+      env:
+        TOOL_PATH: ${{ steps.tool-paths.outputs.gitleaks }}
+      run: |
+        set -euo pipefail
+        (
+          cd "$TOOL_PATH"
+          sha256sum -c gitleaks.sha256
+        )
+        "${TOOL_PATH}/gitleaks" version
+        echo "$TOOL_PATH" >>"$GITHUB_PATH"
+        cp "${TOOL_PATH}/gitleaks" "${GITHUB_WORKSPACE}/gitleaks"
+        chmod 0755 "${GITHUB_WORKSPACE}/gitleaks"

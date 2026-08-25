@@ -78,25 +78,6 @@ jobs:
           echo "Guardrails-Repository: ${REPO}"
           echo "Guardrails-Ref: ${REF}"
 
-      - name: Verify guardrails repository is reachable
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5.0.1
-        with:
-          repository: ${{ inputs.guardrails-repository }}
-          ref: ${{ inputs.guardrails-ref }}
-          path: guardrails-probe
-          fetch-depth: 1
-
-      - name: Verify guardrails scripts are present
-        run: |
-          set -euo pipefail
-          SCRIPT="guardrails-probe/scripts/checks/domain/cicd_sec_03_dependency_chain.sh"
-          if [[ ! -f "$SCRIPT" ]]; then
-            echo "::error::Guardrails checkout at ${{ inputs.guardrails-ref }} does not contain expected scripts (missing ${SCRIPT})."
-            echo "::error::Check guardrails-repository (${{ inputs.guardrails-repository }}), org Actions policy, and that the SHA matches your uses: pin."
-            exit 1
-          fi
-          echo "Guardrails scripts verified at pinned ref."
-
   # ── Result aggregation ────────────────────────────────────────────────────
   summarize:
     name: '📊 Risk summary'
@@ -128,19 +109,18 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
+      # Local composite actions resolve from GITHUB_WORKSPACE, so this must run
+      # after the pinned Guardrails repository has been checked out.
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/aggregate_risk_summary.sh
+
       - name: Download check artifacts (best-effort)
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
         continue-on-error: true
         with:
           path: guardrails-results
-
-      - name: Install yq (for .guardrails.yml)
-        run: |
-          YQ_VERSION="v4.45.1"
-          BASE="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}"
-          curl -sSL -o yq "${BASE}/yq_linux_amd64"
-          chmod +x yq
-          sudo mv yq /usr/local/bin/yq
 
       - name: Generate risk summary
         run: bash guardrails/scripts/aggregate_risk_summary.sh scan_repo guardrails-results
@@ -165,6 +145,11 @@ jobs:
           repository: ${{ inputs.guardrails-repository }}
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
+
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh scan_repo
         env:
@@ -199,6 +184,11 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/checks/domain/cicd_sec_08_action_pinning.sh
+
       - run: bash guardrails/scripts/checks/domain/cicd_sec_08_action_pinning.sh scan_repo
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
@@ -230,6 +220,11 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/checks/domain/cicd_sec_05_permissions.sh
+
       - run: bash guardrails/scripts/checks/domain/cicd_sec_05_permissions.sh scan_repo
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
@@ -260,6 +255,11 @@ jobs:
           repository: ${{ inputs.guardrails-repository }}
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
+
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/checks/domain/cicd_sec_03_dependency_chain.sh
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_03_dependency_chain.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
@@ -293,15 +293,11 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
-      - name: Install gitleaks
-        run: |
-          GITLEAKS_VERSION="8.21.2"
-          ARCHIVE="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          BASE="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
-          curl -sSL -o "$ARCHIVE" "${BASE}/${ARCHIVE}"
-          curl -sSL -o checksums.txt "${BASE}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
-          grep "linux_x64.tar.gz" checksums.txt | sha256sum -c
-          tar xzf "$ARCHIVE" gitleaks
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/checks/domain/cicd_sec_06_secret_scan.sh
+          install-gitleaks: 'true'
 
       - name: Scan for secrets
         run: bash guardrails/scripts/checks/domain/cicd_sec_06_secret_scan.sh scan_repo
@@ -335,6 +331,11 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/checks/domain/cicd_sec_01_flow.sh
+
       - run: bash guardrails/scripts/checks/domain/cicd_sec_01_flow.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
           GH_TOKEN: ${{ secrets['admin-token'] || github.token }}
@@ -366,6 +367,11 @@ jobs:
           repository: ${{ inputs.guardrails-repository }}
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
+
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/checks/domain/cicd_sec_05_branch.sh
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_05_branch.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
@@ -399,6 +405,11 @@ jobs:
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
 
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/checks/domain/cicd_sec_05_runner_access.sh
+
       - run: bash guardrails/scripts/checks/domain/cicd_sec_05_runner_access.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:
           GUARDRAILS_RESULT_DIR: guardrails-results
@@ -429,6 +440,11 @@ jobs:
           repository: ${{ inputs.guardrails-repository }}
           ref: ${{ inputs.guardrails-ref }}
           path: guardrails
+
+      - name: Setup Guardrails tools
+        uses: ./guardrails/.github/actions/setup-tools
+        with:
+          required-script: guardrails/scripts/checks/domain/cicd_sec_07_runner_hardening.sh
 
       - run: bash guardrails/scripts/checks/domain/cicd_sec_07_runner_hardening.sh scan_repo ${{ inputs.strict && '--strict' || '' }}
         env:

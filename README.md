@@ -487,11 +487,11 @@ updates:
 
 **Version pinnen:** Siehe [Quick Start](#quick-start) — für CI, pre-commit und lokale Skripte aus einem Clone dieselbe Commit-SHA verwenden; nie ungepinnte Branch-Referenzen als einzige Quelle.
 
-**gitleaks SHA:** Der `cicd-sec-06-secret-scan` Job lädt gitleaks herunter. Den Versions-Pin in `full-scan.yml` ggf. an die aktuelle Release ([gitleaks Releases](https://github.com/gitleaks/gitleaks/releases)) anpassen.
+**Tool-Setup:** Nach dem expliziten Checkout der gepinnten Guardrails-Quellen verwenden die getrennten Check-Jobs die lokale Composite Action `.github/actions/setup-tools`. Sie stellt `yq` aus einem versionsgebundenen Binär-Cache bereit; nur `cicd-sec-06-secret-scan` installiert zusätzlich das gepinnte, per Hersteller-Checksumme geprüfte `gitleaks`. Cache-Keys enthalten Betriebssystem, Architektur, Tool und Version und verwenden keine partiellen Restore-Keys.
 
 **GITHUB_WORKFLOW_REF:** Die Workflows parsen `GITHUB_WORKFLOW_REF` um den exakten Guardrails-SHA zu ermitteln – Skripte werden immer in der Version geladen die zum aufgerufenen Workflow passt.
 
-**yq:** Auf GitHub-hosted Runnern vorinstalliert. Lokal: `brew install yq`. Wird sowohl von einzelnen Checks als auch vom `.guardrails.yml`-Reader genutzt; fehlt yq, fallen Werte auf konservative Defaults zurück (`mode=fail`).
+**yq:** Der wiederverwendbare Workflow stellt die gepinnte Version für alle Checks und die Zusammenfassung bereit. Lokal: `brew install yq`. Wird sowohl von einzelnen Checks als auch vom `.guardrails.yml`-Reader genutzt; fehlt yq lokal, fallen Werte auf konservative Defaults zurück (`mode=fail`).
 
 **branch-basierte domain checks:** `cicd_sec_01_flow.sh` und `cicd_sec_05_branch.sh` benötigen für vollständige API-Auswertung ein Token mit Branch-Protection-Leserechten. Ohne geeigneten Token werden API-Pfade als Warnung/Skip behandelt.
 
