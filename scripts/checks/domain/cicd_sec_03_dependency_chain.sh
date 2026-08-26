@@ -141,7 +141,7 @@ sec03_phase_python_package_policy() {
 }
 
 sec03_phase_manifests_and_requirements() {
-  sec03_for_each_file cicd_sec_03_audit_js_ts_package_json < <(fp_find_with_names "$PATH_ROOT" "package.json")
+  cicd_sec_03_run_javascript_package_policy "$PATH_ROOT" || true
   sec03_for_each_file cicd_sec_03_audit_go_mod < <(fp_find_with_names "$PATH_ROOT" "go.mod")
   sec03_for_each_file cicd_sec_03_audit_rust_cargo_toml < <(fp_find_with_names "$PATH_ROOT" "Cargo.toml")
   sec03_for_each_file cicd_sec_03_audit_ruby_gemfile < <(fp_find_with_names "$PATH_ROOT" "Gemfile")

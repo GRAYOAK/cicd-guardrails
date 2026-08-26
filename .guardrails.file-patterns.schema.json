@@ -22,7 +22,7 @@
     },
     "package_policy": {
       "type": "object",
-      "description": "Optional overrides merged over the guardrails-shipped Python defaults for CICD-SEC-03.",
+      "description": "Optional overrides merged over the guardrails-shipped ecosystem defaults for CICD-SEC-03.",
       "additionalProperties": false,
       "properties": {
         "python": {
@@ -52,6 +52,48 @@
             "hash_validators": {
               "type": "object",
               "description": "Maps satisfier basename to a built-in validator id (pip_requirements_txt_hashes, poetry_lock_hashes, uv_lock_hashes).",
+              "additionalProperties": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "javascript": {
+          "type": "object",
+          "description": "Partial merge over scripts/config/package_policy.javascript.defaults.yml. Exact package.json, tsconfig.json, and jsconfig.json basenames identify projects by default.",
+          "additionalProperties": false,
+          "properties": {
+            "triggers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Exact basenames that identify JavaScript/TypeScript project directories; default config filenames such as tsconfig.app.json are not matched."
+            },
+            "satisfiers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "allowed_trigger_combinations": {
+              "type": "array",
+              "description": "Exact allowed trigger sets in one directory. The shipped defaults allow package.json alone or package.json beside exactly one of tsconfig.json and jsconfig.json.",
+              "items": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              }
+            },
+            "allowed_satisfier_combinations": {
+              "type": "array",
+              "description": "Exact allowed lockfile-family sets in one package.json directory.",
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            },
+            "manifest_validator": {
+              "type": "string",
+              "enum": ["package_json_exact_specs"]
+            },
+            "hash_validators": {
+              "type": "object",
+              "description": "Maps lockfile basename to npm_lock_integrity, yarn_lock_integrity, or pnpm_lock_integrity.",
               "additionalProperties": { "type": "string", "minLength": 1 }
             }
           }

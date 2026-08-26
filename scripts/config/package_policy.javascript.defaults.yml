@@ -1,0 +1,26 @@
+# Shipped CICD-SEC-03 JavaScript/TypeScript package policy.
+# Merged with .guardrails.file-patterns.yml key package_policy.javascript.
+
+triggers:
+  - package.json
+  - tsconfig.json
+  - jsconfig.json
+satisfiers:
+  - package-lock.json
+  - yarn.lock
+  - pnpm-lock.yaml
+allowed_trigger_combinations:
+  - - package.json
+  - - tsconfig.json
+    - package.json
+  - - jsconfig.json
+    - package.json
+allowed_satisfier_combinations:
+  - - package-lock.json
+  - - yarn.lock
+  - - pnpm-lock.yaml
+manifest_validator: package_json_exact_specs
+hash_validators:
+  package-lock.json: npm_lock_integrity
+  yarn.lock: yarn_lock_integrity
+  pnpm-lock.yaml: pnpm_lock_integrity

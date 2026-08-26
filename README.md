@@ -115,7 +115,7 @@ Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designa
 | Designation | Job-ID | Skript | Scope | Was wird erkannt |
 |---|---|---|---|---|
 | `CICD-SEC-01-FLOW` | `cicd-sec-01-flow` | `scripts/checks/domain/cicd_sec_01_flow.sh` | Settings | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
-| `CICD-SEC-03-DEPENDENCY-CHAIN` | `cicd-sec-03-dependency-chain` | `scripts/checks/domain/cicd_sec_03_dependency_chain.sh` | Code | Python: verzeichnisbasierte `package_policy` (Defaults im Repo + Overlay); andere Ökosysteme: Manifeste/Lockfiles; Workflow-`uses:`-SHA-Pins; Dockerfile-Digests; `find` im Skript |
+| `CICD-SEC-03-DEPENDENCY-CHAIN` | `cicd-sec-03-dependency-chain` | `scripts/checks/domain/cicd_sec_03_dependency_chain.sh` | Code | Python und JavaScript/TypeScript: verzeichnisbasierte `package_policy` (Defaults + Overlay), exakte Dependency-Pins und Lockfile-Integrität; Workflow-`uses:`-SHA-Pins; Dockerfile-Digests |
 | `CICD-SEC-04-POISONED-PIPELINE` | `cicd-sec-04-poisoned-pipeline` | `scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh` | Code | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
 | `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Code | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
 | `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Settings | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
@@ -256,10 +256,11 @@ Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03-DEPENDENCY-CHAIN` leb
 - `global_excludes` — weitere `find -not -path` Muster (additiv zu den Defaults)
 - `validation_skip_paths` — relative Pfade, die zwar gefunden, aber **ohne** Manifest-/Lock-Policy geprüft werden (sinnvoll für reine Tooling-`pyproject.toml`-Verzeichnisse)
 - `package_policy.python` — partielles Überschreiben der im Guardrails-Repo mitgelieferten Python-Standardpolicy (`scripts/config/package_policy.defaults.yml`): `triggers` (welche Dateinamen ein Verzeichnis als Python-Projekt markieren), `satisfiers` (OR-Liste erlaubter Nachweis-Dateien nebenan), `allowed_trigger_combinations` (exakte erlaubte Trigger-Mengen bei mehr als einem Trigger gleichzeitig), `hash_validators` (Zuordnung Satisfier-Dateiname zu eingebautem Validator)
+- `package_policy.javascript` — partielles Überschreiben der JavaScript/TypeScript-Standardpolicy (`scripts/config/package_policy.javascript.defaults.yml`): exakt `package.json`, `tsconfig.json` und `jsconfig.json` als Trigger (nicht z. B. `tsconfig.app.json`), npm/Yarn/pnpm-Lockfiles als Satisfier, erlaubte Trigger-Kombinationen, genau eine Lockfile-Familie im selben Verzeichnis sowie Manifest- und Integritätsvalidatoren
 
-Merge-Verhalten: Ohne `yq` wird die mitgelieferte Default-Datei unverändert verwendet. Mit `yq` werden `package_policy.python`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
+Merge-Verhalten: Ohne `yq` werden die mitgelieferten Default-Dateien unverändert verwendet. Mit `yq` werden die jeweiligen `package_policy.python`- bzw. `package_policy.javascript`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
 
-**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse im Guardrails-Skript-Helfer, danach die flache Python-Default-Datei [`scripts/config/package_policy.defaults.yml`](scripts/config/package_policy.defaults.yml), zuletzt optional das Overlay im Zielrepo. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) im Guardrails-Repository ist **nur Dokumentation** (Handler-Tabelle, Spiegel der Built-in-Excludes, vollständiges Spiegelbild von `package_policy.python`); sie wird von den Checks **nicht** eingelesen. Wenn `yq` installiert ist, stellt `tests/test_checks.sh` sicher, dass der Block `package_policy.python` in der Referenzdatei mit der mitgelieferten Default-Datei übereinstimmt — bei Änderungen an der Default-Datei die Referenz im selben Change Set anpassen.
+**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Ecosystem-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
 
 Schema: [`.guardrails.file-patterns.schema.json`](.guardrails.file-patterns.schema.json). Handler- und Dateizuordnung sowie das dokumentierte Default-Spiegelbild: [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml). Einlesen der Overlay-Datei im gescannten Repo erfolgt mit `yq`; fehlt `yq` oder die Overlay-Datei, bleiben die eingebauten Defaults aktiv (Python-Policy aus der Default-Datei, andere Ausschlüsse wie bisher).
 
@@ -376,7 +377,8 @@ cicd-guardrails/
 │
 ├── scripts/
 │   ├── config/
-│   │   └── package_policy.defaults.yml   # Python CICD-SEC-03 Standardpolicy (Flat-YAML)
+│   │   ├── package_policy.defaults.yml   # Python CICD-SEC-03 Standardpolicy
+│   │   └── package_policy.javascript.defaults.yml # JS/TS Standardpolicy
 │   ├── checks/
 │   │   ├── domain/                       # Fachliche Startpunkte (cicd_sec_*)
 │   │   │   ├── cicd_sec_01_flow.sh
@@ -403,7 +405,7 @@ cicd-guardrails/
 │       ├── config.sh                     # .guardrails.yml Reader (Context + Checks)
 │       ├── feedback.sh                   # Reporting-Helper, Mode-Override
 │       ├── file_patterns.sh              # find-Helfer, Overlay global_excludes / validation_skip_paths
-│       ├── package_policy.sh             # Python package_policy Merge (Defaults + Overlay)
+│       ├── package_policy.sh             # Ecosystem package_policy Merge (Defaults + Overlay)
 │       └── package_scan.sh               # Shared helper functions for package checks
 │
 └── tests/
@@ -454,6 +456,15 @@ Aktuelle Sprachmodule:
 - `scripts/checks/domain/package/php.sh`
 
 Das unterstützt Repositories mit einem Service im Root und Monorepos mit vielen verschachtelten Services.
+
+Für JavaScript/TypeScript gilt pro Projektverzeichnis:
+
+- Exakt `tsconfig.json` und `jsconfig.json` markieren zusätzlich ein Projekt; Varianten wie `tsconfig.app.json` werden nicht als Trigger ausgewertet.
+- Liegt einer dieser Config-Trigger ohne `package.json` im selben Verzeichnis, schlägt der Check fehl. Erlaubt sind `package.json` allein sowie `package.json` mit genau `tsconfig.json` oder `jsconfig.json`.
+- genau eine Lockfile-Familie: `package-lock.json`, `yarn.lock` (Classic oder Berry) oder `pnpm-lock.yaml`; kein Workspace-Root-Walk-up
+- exakte SemVer-Pins in `dependencies`, `devDependencies` und `optionalDependencies`; `peerDependencies` dürfen Ranges behalten
+- erlaubt sind außerdem `file:`, `link:`, `workspace:`, exakte `npm:`-Aliase sowie Git-/URL-Referenzen mit vollständigem 40-stelligem Commit-SHA
+- npm-v2/v3-Integrität, Yarn-v1-Integrity bzw. Yarn-Berry-Checksums und pnpm-Integrity werden geprüft
 
 ---
 

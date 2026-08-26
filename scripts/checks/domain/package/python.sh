@@ -88,16 +88,13 @@ import re, sys
 
 path = sys.argv[1]
 raw_lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
-drop_physical = re.compile(r"^\s*(#|-r |--|-i |)$")
 events = []
 
 for phys_ln, line in enumerate(raw_lines, start=1):
-    if drop_physical.match(line):
+    s = line.strip()
+    if not s or s.startswith("#") or s.startswith(("-r ", "-c ", "-i ", "--")):
         continue
     if "==" in line:
-        continue
-    s = line.strip()
-    if not s:
         continue
     events.append((phys_ln, 0, "UNPINNED", s))
 

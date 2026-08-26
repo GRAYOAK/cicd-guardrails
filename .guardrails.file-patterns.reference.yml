@@ -1,12 +1,14 @@
 # Human-readable documentation of effective file-scan defaults in this repository.
 # Runtime in consumer checkouts reads only `.guardrails.file-patterns.yml` when present;
-# built-in find excludes live in the guardrails scripts, and Python policy defaults ship
-# in the flat YAML next to this file (see package_policy.python below as a mirror).
+# built-in find excludes live in the guardrails scripts, and package policy defaults ship
+# in flat YAML files under scripts/config (mirrored under package_policy below).
 # Do not require copying this file into consumer repositories.
 #
 # policy_handler / artifact        implementation (relative to guardrails repo)
 # ---------------------------------------------------------------------------
-# js_ts / package.json              scripts/checks/domain/package/js_ts.sh — cicd_sec_03_audit_js_ts_package_json
+# js_ts / package.json             package_policy.javascript + scripts/checks/domain/package/js_ts.sh
+# js_ts / tsconfig.json            same — exact TypeScript project trigger
+# js_ts / jsconfig.json            same — exact JavaScript project trigger
 # js_ts / package-lock.json        same — cicd_sec_03_audit_js_ts_lock_package_lock
 # js_ts / yarn.lock                same — cicd_sec_03_audit_js_ts_lock_yarn
 # js_ts / pnpm-lock.yaml           same — cicd_sec_03_audit_js_ts_lock_pnpm
@@ -59,5 +61,30 @@ package_policy:
       requirements-dev.txt: pip_requirements_txt_hashes
       poetry.lock: poetry_lock_hashes
       uv.lock: uv_lock_hashes
+  # Mirror of scripts/config/package_policy.javascript.defaults.yml.
+  javascript:
+    triggers:
+      - package.json
+      - tsconfig.json
+      - jsconfig.json
+    satisfiers:
+      - package-lock.json
+      - yarn.lock
+      - pnpm-lock.yaml
+    allowed_trigger_combinations:
+      - - package.json
+      - - tsconfig.json
+        - package.json
+      - - jsconfig.json
+        - package.json
+    allowed_satisfier_combinations:
+      - - package-lock.json
+      - - yarn.lock
+      - - pnpm-lock.yaml
+    manifest_validator: package_json_exact_specs
+    hash_validators:
+      package-lock.json: npm_lock_integrity
+      yarn.lock: yarn_lock_integrity
+      pnpm-lock.yaml: pnpm_lock_integrity
 
 # Minimal overlay examples for consumer repos: see README (Dateiscan-Overlay).
