@@ -60,13 +60,63 @@ fb_add_searched "Package manifests and lockfiles (npm, pnpm, yarn, go, Cargo, Ru
 fb_add_searched "GitHub workflow YAML files for third-party action SHA pins"
 fb_add_searched "Dockerfiles for digest-pinned base images"
 
+declare -a SEC03_PACKAGE_JSON=()
+declare -a SEC03_GO_MOD=()
+declare -a SEC03_CARGO_TOML=()
+declare -a SEC03_GEMFILE=()
+declare -a SEC03_COMPOSER_JSON=()
+declare -a SEC03_PACKAGE_LOCK=()
+declare -a SEC03_YARN_LOCK=()
+declare -a SEC03_PNPM_LOCK=()
+declare -a SEC03_GO_SUM=()
+declare -a SEC03_CARGO_LOCK=()
+declare -a SEC03_GEMFILE_LOCK=()
+declare -a SEC03_COMPOSER_LOCK=()
+declare -a SEC03_WORKFLOWS=()
+declare -a SEC03_DOCKERFILES=()
+
+sec03_collect_inventory() {
+  local path basename
+  while IFS= read -r path; do
+    [[ -z "$path" || ! -f "$path" ]] && continue
+    basename="${path##*/}"
+    case "$basename" in
+      package.json) SEC03_PACKAGE_JSON+=("$path") ;;
+      go.mod) SEC03_GO_MOD+=("$path") ;;
+      Cargo.toml) SEC03_CARGO_TOML+=("$path") ;;
+      Gemfile) SEC03_GEMFILE+=("$path") ;;
+      composer.json) SEC03_COMPOSER_JSON+=("$path") ;;
+      package-lock.json) SEC03_PACKAGE_LOCK+=("$path") ;;
+      yarn.lock) SEC03_YARN_LOCK+=("$path") ;;
+      pnpm-lock.yaml) SEC03_PNPM_LOCK+=("$path") ;;
+      go.sum) SEC03_GO_SUM+=("$path") ;;
+      Cargo.lock) SEC03_CARGO_LOCK+=("$path") ;;
+      Gemfile.lock) SEC03_GEMFILE_LOCK+=("$path") ;;
+      composer.lock) SEC03_COMPOSER_LOCK+=("$path") ;;
+    esac
+  done < <(
+    fp_find_with_names "$PATH_ROOT" \
+      "package.json" "go.mod" "Cargo.toml" "Gemfile" "composer.json" \
+      "package-lock.json" "yarn.lock" "pnpm-lock.yaml" "go.sum" \
+      "Cargo.lock" "Gemfile.lock" "composer.lock"
+  )
+
+  while IFS= read -r path; do
+    [[ -n "$path" && -f "$path" ]] && SEC03_WORKFLOWS+=("$path")
+  done < <(fp_find_workflow_yamls)
+  while IFS= read -r path; do
+    [[ -n "$path" && -f "$path" ]] && SEC03_DOCKERFILES+=("$path")
+  done < <(fp_find_dockerfiles)
+}
+
 sec03__coverage_inventory() {
   local phase_name="$1"
   local filename="$2"
+  shift 2
   local total=0 skipped=0 audited=0
-  local lim samp="" n=0
+  local lim samp="" n=0 abs_path
   lim="$(fb_coverage_path_sample_limit)"
-  while IFS= read -r abs_path; do
+  for abs_path in "$@"; do
     [[ -z "$abs_path" || ! -f "$abs_path" ]] && continue
     total=$((total + 1))
     local rel
@@ -80,7 +130,7 @@ sec03__coverage_inventory() {
       samp="${samp:+$samp; }${rel}"
       n=$((n + 1))
     fi
-  done < <(fp_find_with_names "$PATH_ROOT" "$filename")
+  done
   fb_add_coverage "${phase_name} (${filename}): found ${total}, skipped by repository validation rules ${skipped}, evaluated ${audited}${samp:+; sample: }${samp}"
 }
 
@@ -88,7 +138,7 @@ sec03__coverage_workflows_and_dockerfiles() {
   local w_total=0 w_skip=0 w_aud=0 d_total=0 d_skip=0 d_aud=0
   local lim ws="" ds="" wn=0 dn=0
   lim="$(fb_coverage_path_sample_limit)"
-  while IFS= read -r wf; do
+  for wf in "${SEC03_WORKFLOWS[@]}"; do
     [[ -z "$wf" || ! -f "$wf" ]] && continue
     w_total=$((w_total + 1))
     local wrel
@@ -102,8 +152,8 @@ sec03__coverage_workflows_and_dockerfiles() {
       ws="${ws:+$ws; }${wrel}"
       wn=$((wn + 1))
     fi
-  done < <(fp_find_workflow_yamls)
-  while IFS= read -r df; do
+  done
+  for df in "${SEC03_DOCKERFILES[@]}"; do
     [[ -z "$df" || ! -f "$df" ]] && continue
     d_total=$((d_total + 1))
     local drel
@@ -117,7 +167,7 @@ sec03__coverage_workflows_and_dockerfiles() {
       ds="${ds:+$ds; }${drel}"
       dn=$((dn + 1))
     fi
-  done < <(fp_find_dockerfiles)
+  done
   fb_add_coverage "Workflow YAML for third-party action pins: ${w_total} files (${w_skip} skipped, ${w_aud} evaluated)${ws:+; sample: }${ws}"
   fb_add_coverage "Dockerfiles for digest-pinned bases: ${d_total} files (${d_skip} skipped, ${d_aud} evaluated)${ds:+; sample: }${ds}"
 }
@@ -125,7 +175,8 @@ sec03__coverage_workflows_and_dockerfiles() {
 sec03_for_each_file() {
   local callback="$1"
   shift
-  while IFS= read -r abs_path; do
+  local abs_path
+  for abs_path in "$@"; do
     [[ -z "$abs_path" || ! -f "$abs_path" ]] && continue
     local rel
     rel="$(fp_rel_path "$abs_path")"
@@ -141,25 +192,24 @@ sec03_phase_python_package_policy() {
 }
 
 sec03_phase_manifests_and_requirements() {
-  cicd_sec_03_run_javascript_package_policy "$PATH_ROOT" || true
-  sec03_for_each_file cicd_sec_03_audit_go_mod < <(fp_find_with_names "$PATH_ROOT" "go.mod")
-  sec03_for_each_file cicd_sec_03_audit_rust_cargo_toml < <(fp_find_with_names "$PATH_ROOT" "Cargo.toml")
-  sec03_for_each_file cicd_sec_03_audit_ruby_gemfile < <(fp_find_with_names "$PATH_ROOT" "Gemfile")
-  sec03_for_each_file cicd_sec_03_audit_php_composer_json < <(fp_find_with_names "$PATH_ROOT" "composer.json")
+  cicd_sec_03_run_javascript_package_policy "$PATH_ROOT" --files "${SEC03_PACKAGE_JSON[@]}" || true
+  sec03_for_each_file cicd_sec_03_audit_go_mod "${SEC03_GO_MOD[@]}"
+  sec03_for_each_file cicd_sec_03_audit_rust_cargo_toml "${SEC03_CARGO_TOML[@]}"
+  sec03_for_each_file cicd_sec_03_audit_ruby_gemfile "${SEC03_GEMFILE[@]}"
+  sec03_for_each_file cicd_sec_03_audit_php_composer_json "${SEC03_COMPOSER_JSON[@]}"
 }
 
 sec03_phase_lockfiles() {
-  sec03_for_each_file cicd_sec_03_audit_js_ts_lock_package_lock < <(fp_find_with_names "$PATH_ROOT" "package-lock.json")
-  sec03_for_each_file cicd_sec_03_audit_js_ts_lock_yarn < <(fp_find_with_names "$PATH_ROOT" "yarn.lock")
-  sec03_for_each_file cicd_sec_03_audit_js_ts_lock_pnpm < <(fp_find_with_names "$PATH_ROOT" "pnpm-lock.yaml")
-  sec03_for_each_file cicd_sec_03_audit_go_sum < <(fp_find_with_names "$PATH_ROOT" "go.sum")
-  sec03_for_each_file cicd_sec_03_audit_rust_cargo_lock < <(fp_find_with_names "$PATH_ROOT" "Cargo.lock")
-  sec03_for_each_file cicd_sec_03_audit_ruby_gemfile_lock < <(fp_find_with_names "$PATH_ROOT" "Gemfile.lock")
-  sec03_for_each_file cicd_sec_03_audit_php_composer_lock < <(fp_find_with_names "$PATH_ROOT" "composer.lock")
+  sec03_for_each_file cicd_sec_03_audit_go_sum "${SEC03_GO_SUM[@]}"
+  sec03_for_each_file cicd_sec_03_audit_rust_cargo_lock "${SEC03_CARGO_LOCK[@]}"
+  sec03_for_each_file cicd_sec_03_audit_ruby_gemfile_lock "${SEC03_GEMFILE_LOCK[@]}"
+  sec03_for_each_file cicd_sec_03_audit_php_composer_lock "${SEC03_COMPOSER_LOCK[@]}"
 }
 
 sec03_phase_workflows_and_dockerfiles() {
-  while IFS= read -r wf; do
+  local wf df
+  fb_phase "workflows"
+  for wf in "${SEC03_WORKFLOWS[@]}"; do
     [[ -z "$wf" || ! -f "$wf" ]] && continue
     local rel
     rel="$(fp_rel_path "$wf")"
@@ -167,9 +217,10 @@ sec03_phase_workflows_and_dockerfiles() {
       continue
     fi
     action_pin_scan_file "$PATH_ROOT" "$wf" "workflows" || true
-  done < <(fp_find_workflow_yamls)
+  done
 
-  while IFS= read -r df; do
+  fb_phase "docker"
+  for df in "${SEC03_DOCKERFILES[@]}"; do
     [[ -z "$df" || ! -f "$df" ]] && continue
     local rel
     rel="$(fp_rel_path "$df")"
@@ -177,26 +228,32 @@ sec03_phase_workflows_and_dockerfiles() {
       continue
     fi
     dockerfile_pin_scan_file "$PATH_ROOT" "$df" || true
-  done < <(fp_find_dockerfiles)
+  done
 }
 
+fb_phase "inventory"
+sec03_collect_inventory
+fb_phase "python"
 sec03_phase_python_package_policy
+fb_phase "js"
 sec03_phase_manifests_and_requirements
+fb_phase "lockfiles"
 sec03_phase_lockfiles
 sec03_phase_workflows_and_dockerfiles
 
-sec03__coverage_inventory "Manifest" "package.json"
-sec03__coverage_inventory "Manifest" "go.mod"
-sec03__coverage_inventory "Manifest" "Cargo.toml"
-sec03__coverage_inventory "Manifest" "Gemfile"
-sec03__coverage_inventory "Manifest" "composer.json"
-sec03__coverage_inventory "Lock" "package-lock.json"
-sec03__coverage_inventory "Lock" "yarn.lock"
-sec03__coverage_inventory "Lock" "pnpm-lock.yaml"
-sec03__coverage_inventory "Lock" "go.sum"
-sec03__coverage_inventory "Lock" "Cargo.lock"
-sec03__coverage_inventory "Lock" "Gemfile.lock"
-sec03__coverage_inventory "Lock" "composer.lock"
+fb_phase "summary"
+sec03__coverage_inventory "Manifest" "package.json" "${SEC03_PACKAGE_JSON[@]}"
+sec03__coverage_inventory "Manifest" "go.mod" "${SEC03_GO_MOD[@]}"
+sec03__coverage_inventory "Manifest" "Cargo.toml" "${SEC03_CARGO_TOML[@]}"
+sec03__coverage_inventory "Manifest" "Gemfile" "${SEC03_GEMFILE[@]}"
+sec03__coverage_inventory "Manifest" "composer.json" "${SEC03_COMPOSER_JSON[@]}"
+sec03__coverage_inventory "Lock" "package-lock.json" "${SEC03_PACKAGE_LOCK[@]}"
+sec03__coverage_inventory "Lock" "yarn.lock" "${SEC03_YARN_LOCK[@]}"
+sec03__coverage_inventory "Lock" "pnpm-lock.yaml" "${SEC03_PNPM_LOCK[@]}"
+sec03__coverage_inventory "Lock" "go.sum" "${SEC03_GO_SUM[@]}"
+sec03__coverage_inventory "Lock" "Cargo.lock" "${SEC03_CARGO_LOCK[@]}"
+sec03__coverage_inventory "Lock" "Gemfile.lock" "${SEC03_GEMFILE_LOCK[@]}"
+sec03__coverage_inventory "Lock" "composer.lock" "${SEC03_COMPOSER_LOCK[@]}"
 sec03__coverage_workflows_and_dockerfiles
 
 fb_auto_status "$STRICT_MODE"

@@ -52,10 +52,28 @@ assert_output_count() {
   local actual
   actual="$(python3 -c 'import sys; print(sys.stdin.read().count(sys.argv[1]))' "$expected" <<<"$LAST_OUTPUT")"
   if [[ "$actual" -eq "$count" ]]; then
-    echo "  ✅ $description"
+    echo "  ??? $description"
     PASS=$((PASS + 1))
   else
-    echo "  ❌ $description (expected $count occurrence(s) of '$expected', got $actual)"
+    echo "  ??? $description (expected $count occurrence(s) of '$expected', got $actual)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+assert_json_duration_seconds() {
+  local description="$1"
+  local json_path="$2"
+  if python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+v = d.get("duration_seconds")
+assert isinstance(v, int) and not isinstance(v, bool), type(v)
+assert v >= 0
+' "$json_path"; then
+    echo "  ??? $description"
+    PASS=$((PASS + 1))
+  else
+    echo "  ??? $description (duration_seconds missing or not an integer >= 0)"
     FAIL=$((FAIL + 1))
   fi
 }
@@ -157,6 +175,21 @@ assert_output_contains "includes Scan coverage block" "### Scan coverage"
 assert_output_contains "includes Found block" "### Found"
 assert_output_contains "includes Remediation block" "### Remediation"
 assert_output_contains "renders Mode line" "Mode: **fail**"
+assert_output_contains "renders Duration line" "Duration: **"
+assert_output_contains "emits coarse start phase" "phase: start"
+teardown
+
+echo ""
+echo "▶ result JSON includes duration_seconds"
+setup
+cp "$FIXTURES_DIR/bad-prt.yml" "$TMP/.github/workflows/ci.yml"
+mkdir -p "$TMP/results"
+export GUARDRAILS_RESULT_DIR="$TMP/results"
+run_check "$DOMAIN_DIR/cicd_sec_04_poisoned_pipeline.sh" "$TMP"
+unset GUARDRAILS_RESULT_DIR
+assert_exit "check still fails with result dir set" 1 "$LAST_EXIT"
+assert_json_duration_seconds "JSON duration_seconds is integer >= 0" \
+  "$TMP/results/CICD-SEC-04-POISONED-PIPELINE.json"
 teardown
 
 echo ""
@@ -183,6 +216,13 @@ setup
 echo '{"name":"demo"}' > "$TMP/package.json"
 run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when npm lockfile is missing" 1 "$LAST_EXIT"
+assert_output_contains "SEC-03 phase inventory" "phase: inventory"
+assert_output_contains "SEC-03 phase python" "phase: python"
+assert_output_contains "SEC-03 phase js" "phase: js"
+assert_output_contains "SEC-03 phase lockfiles" "phase: lockfiles"
+assert_output_contains "SEC-03 phase workflows" "phase: workflows"
+assert_output_contains "SEC-03 phase docker" "phase: docker"
+assert_output_contains "SEC-03 phase summary" "phase: summary"
 teardown
 
 echo ""
@@ -379,6 +419,21 @@ write_empty_yarn_lock "$TMP/yarn.lock"
 run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when two lockfile families coexist" 1 "$LAST_EXIT"
 assert_output_contains "reports multiple lockfile families" "multiple lockfile families"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh ignores manifests in generated directories"
+setup
+mkdir -p "$TMP/frontend/.next/dev" "$TMP/frontend/coverage" "$TMP/frontend/.turbo"
+echo '{"name":"next-build-artifact","dependencies":{"lodash":"4.17.21"}}' >"$TMP/frontend/.next/dev/package.json"
+echo '{"name":"coverage-artifact"}' >"$TMP/frontend/coverage/package.json"
+echo '{"name":"turbo-artifact"}' >"$TMP/frontend/.turbo/package.json"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "passes when only generated directories contain package.json" 0 "$LAST_EXIT"
+echo '{"name":"real-app","private":true}' >"$TMP/frontend/package.json"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "still fails for a real package.json outside generated directories" 1 "$LAST_EXIT"
+assert_output_contains "reports the real project as missing a lockfile" "frontend/package.json"
 teardown
 
 echo ""
@@ -759,6 +814,7 @@ assert_exit "leaks fail in default fail mode" 1 "$LAST_EXIT"
 assert_output_contains "lists file line and rule in Found" "[error] config/app.env:3"
 assert_output_contains "lists gitleaks rule id" 'gitleaks rule "generic-api-key"'
 assert_output_contains "lists second rule on same line" 'gitleaks rule "jwt"'
+assert_output_contains "SEC-06 phase gitleaks" "phase: gitleaks"
 if [[ "$(printf '%s' "$LAST_OUTPUT" | grep -c 'config/app.env:3')" -eq 2 ]]; then
   echo "  ✅ dedupes findings per file line and rule"
   PASS=$((PASS + 1))
@@ -835,7 +891,7 @@ echo "▶ aggregate_risk_summary.sh"
 setup
 mkdir -p "$TMP/scan_repo" "$TMP/results"
 cat > "$TMP/results/CICD-SEC-01-FLOW.json" <<'EOF'
-{"check_id":"CICD-SEC-01-FLOW","title":"Flow control policy check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-01-Insufficient-Flow-Control-Mechanisms/"}
+{"check_id":"CICD-SEC-01-FLOW","title":"Flow control policy check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-01-Insufficient-Flow-Control-Mechanisms/","duration_seconds":3}
 EOF
 cat > "$TMP/results/CICD-SEC-07-RUNNER-HARDENING.json" <<'EOF'
 {"check_id":"CICD-SEC-07-RUNNER-HARDENING","title":"Runner hardening check","status":"FAIL","mode":"fail","counts":{"errors":1,"warnings":0,"notices":0},"owasp_reference":"https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-07-Insecure-System-Configuration/"}
@@ -849,6 +905,7 @@ assert_output_contains "groups Critical by Code and Settings (settings bucket)" 
 assert_aggregate_critical_scope_order "Critical: Code bucket lists runner hardening before Settings lists flow check"
 assert_output_contains "includes OWASP short reference labels" "[OWASP CICD-SEC-01-FLOW]"
 assert_output_contains "lists container_registry context" "container_registry:"
+assert_output_contains "shows duration next to status in coverage" "duration: \`3s\`"
 teardown
 
 if command -v yq >/dev/null 2>&1; then
@@ -889,6 +946,24 @@ EOF
   echo "▶ .guardrails.file-patterns.reference.yml mirrors package_policy.defaults.yml"
   DEFAULTS_YML="${ROOT_DIR}/scripts/config/package_policy.defaults.yml"
   REF_YML="${ROOT_DIR}/.guardrails.file-patterns.reference.yml"
+  runtime_excludes() {
+    bash -c "source '${ROOT_DIR}/scripts/lib/file_patterns.sh'; fp_default_excludes"
+  }
+  # JSON detour drops the per-entry documentation comments in the reference file.
+  reference_excludes() {
+    yq -oj '.global_excludes' "$REF_YML" \
+      | python3 -c 'import json, sys
+for item in json.load(sys.stdin):
+    print(item)'
+  }
+  if diff -q <(runtime_excludes) <(reference_excludes) >/dev/null 2>&1; then
+    echo "  ✅ reference global_excludes matches fp_default_excludes"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ reference global_excludes drifts from scripts/lib/file_patterns.sh"
+    diff -u <(runtime_excludes) <(reference_excludes) || true
+    FAIL=$((FAIL + 1))
+  fi
   # JSON-normalized compare ignores header comments in the flat defaults file.
   if diff -q <(yq eval -oj '.' "$DEFAULTS_YML") <(yq eval -oj '.package_policy.python' "$REF_YML") >/dev/null 2>&1; then
     echo "  ✅ reference package_policy.python matches shipped defaults"

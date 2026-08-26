@@ -13,7 +13,7 @@
     "global_excludes": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Additional find -not -path globs merged with built-in excludes."
+      "description": "Additional find -not -path globs merged with the built-in excludes (*/.git/*, */node_modules/*, */.venv/*, */target/*, */.next/*, */.nuxt/*, */.output/*, */.turbo/*, */.cache/*, */__pycache__/*, */coverage/*). Overlay entries add to that list; they never remove built-ins."
     },
     "validation_skip_paths": {
       "type": "array",

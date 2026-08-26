@@ -17,6 +17,7 @@ FB_FOUND_ROWS=()
 FB_FINDING_DETAIL_MARKDOWN=""
 FB_COVERAGE=""
 FB_SCAN_COVERAGE_MARKDOWN=""
+FB_START_SECONDS=0
 
 fb__coverage_level() {
   case "${GUARDRAILS_COVERAGE:-compact}" in
@@ -59,6 +60,28 @@ fb__json_escape() {
   printf '%s' "$s"
 }
 
+fb__elapsed_seconds() {
+  local start="${FB_START_SECONDS:-0}"
+  local now="${SECONDS:-0}"
+  local d=$((now - start))
+  if [[ "$d" -lt 0 ]]; then
+    d=0
+  fi
+  printf '%s' "$d"
+}
+
+# Coarse progress for CI job logs. A handful of phases per check; never per file.
+fb_phase() {
+  local phase="${1:-}"
+  [[ -z "$phase" ]] && return 0
+  local msg="${FB_CHECK_ID:-check} phase: ${phase}"
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    echo "::notice::${msg}"
+  else
+    echo "${msg}" >&2
+  fi
+}
+
 fb_write_result_json() {
   local out_dir="${GUARDRAILS_RESULT_DIR:-}"
   if [[ -z "$out_dir" ]]; then
@@ -68,6 +91,8 @@ fb_write_result_json() {
   mkdir -p "$out_dir"
   local fname="${FB_CHECK_ID//[^a-zA-Z0-9._-]/_}.json"
   local out_path="${out_dir%/}/${fname}"
+  local duration_seconds
+  duration_seconds="$(fb__elapsed_seconds)"
 
   local owasp
   owasp="$(fb__json_escape "$FB_OWASP_REF")"
@@ -89,7 +114,8 @@ fb_write_result_json() {
   },
   "owasp_reference": "${owasp}",
   "finding_detail_markdown": ${detail_json},
-  "scan_coverage_markdown": ${coverage_json}
+  "scan_coverage_markdown": ${coverage_json},
+  "duration_seconds": ${duration_seconds}
 }
 EOF
 }
@@ -110,6 +136,8 @@ fb_init() {
   FB_FINDING_DETAIL_MARKDOWN=""
   FB_COVERAGE=""
   FB_SCAN_COVERAGE_MARKDOWN=""
+  FB_START_SECONDS="${SECONDS:-0}"
+  fb_phase "start"
 }
 
 fb_add_searched() {
@@ -350,6 +378,7 @@ fb_summary() {
     report+="- OWASP reference: ${FB_OWASP_REF}\n"
   fi
   report+="- Counts: errors=${FB_ERROR_COUNT}, warnings=${FB_WARNING_COUNT}, notices=${FB_NOTICE_COUNT}\n"
+  report+="- Duration: **$(fb__elapsed_seconds)s**\n"
   report+="\n"
   report+="### Searched\n"
   report+="${searched_block}"

@@ -425,6 +425,10 @@ while IFS= read -r jf; do
   [[ -z "$jf" || ! -f "$jf" ]] && continue
   cid="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["check_id"])' "$jf")"
   jst="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$jf")"
+  jdur="$(python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+v=d.get("duration_seconds")
+print("" if v is None else v)' "$jf")"
   cov="$(python3 -c 'import json,sys
 p=sys.argv[1]
 lim=int(sys.argv[2])
@@ -434,6 +438,9 @@ if len(c) > lim:
     c = c[:lim] + "\n\n…(truncated)"
 print(c)' "$jf" 1800)"
   coverage_all+="- **${cid}** — status: \`${jst}\`"
+  if [[ -n "$jdur" ]]; then
+    coverage_all+=", duration: \`${jdur}s\`"
+  fi
   if [[ -z "$cov" ]]; then
     coverage_all+=" — _(no scan coverage in artifact)_\n\n"
   else

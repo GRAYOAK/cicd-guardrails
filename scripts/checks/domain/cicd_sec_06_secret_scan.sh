@@ -45,6 +45,7 @@ fi
 
 report_json="$(mktemp)"
 output_file="$(mktemp)"
+fb_phase "gitleaks"
 set +e
 ./gitleaks detect \
   --source "$PATH_ROOT" \
