@@ -45,6 +45,21 @@ assert_output_contains() {
   fi
 }
 
+assert_output_count() {
+  local description="$1"
+  local expected="$2"
+  local count="$3"
+  local actual
+  actual="$(python3 -c 'import sys; print(sys.stdin.read().count(sys.argv[1]))' "$expected" <<<"$LAST_OUTPUT")"
+  if [[ "$actual" -eq "$count" ]]; then
+    echo "  ✅ $description"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ $description (expected $count occurrence(s) of '$expected', got $actual)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 assert_aggregate_critical_scope_order() {
   local description="$1"
   if printf '%s' "$LAST_OUTPUT" | python3 -c '
@@ -168,6 +183,63 @@ setup
 echo '{"name":"demo"}' > "$TMP/package.json"
 run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when npm lockfile is missing" 1 "$LAST_EXIT"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh accepts configured TypeScript and JavaScript projects"
+setup
+mkdir -p "$TMP/ts-green" "$TMP/js-green"
+echo '{}' >"$TMP/ts-green/tsconfig.json"
+echo '{"name":"ts-green","private":true}' >"$TMP/ts-green/package.json"
+write_empty_npm_lock "$TMP/ts-green/package-lock.json"
+echo '{}' >"$TMP/js-green/jsconfig.json"
+echo '{"name":"js-green","private":true}' >"$TMP/js-green/package.json"
+write_empty_yarn_lock "$TMP/js-green/yarn.lock"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "passes exact tsconfig/jsconfig projects with package.json and one lockfile" 0 "$LAST_EXIT"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh ignores specialized compiler config filenames"
+setup
+echo '{}' >"$TMP/tsconfig.app.json"
+echo '{}' >"$TMP/jsconfig.build.json"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "passes when only non-exact tsconfig/jsconfig variants exist" 0 "$LAST_EXIT"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh rejects lone TypeScript and JavaScript project configs"
+setup
+mkdir -p "$TMP/ts-red" "$TMP/js-red"
+echo '{}' >"$TMP/ts-red/tsconfig.json"
+echo '{}' >"$TMP/js-red/jsconfig.json"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "fails when exact tsconfig/jsconfig projects lack package.json" 1 "$LAST_EXIT"
+assert_output_contains "reports lone tsconfig.json" "ts-red/tsconfig.json"
+assert_output_contains "reports lone jsconfig.json" "js-red/jsconfig.json"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh rejects ambiguous JavaScript trigger sets"
+setup
+echo '{}' >"$TMP/tsconfig.json"
+echo '{}' >"$TMP/jsconfig.json"
+echo '{"name":"ambiguous","private":true}' >"$TMP/package.json"
+write_empty_npm_lock "$TMP/package-lock.json"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "fails when tsconfig.json and jsconfig.json share one package directory" 1 "$LAST_EXIT"
+assert_output_contains "reports ambiguous JavaScript/TypeScript triggers" "Ambiguous JavaScript/TypeScript project triggers"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh audits config and package.json directories once"
+setup
+echo '{}' >"$TMP/tsconfig.json"
+echo '{"name":"typed","private":true}' >"$TMP/package.json"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "fails when a configured TypeScript project lacks a lockfile" 1 "$LAST_EXIT"
+assert_output_count "reports one missing-lock finding for tsconfig beside package.json" "JavaScript project is missing a lockfile" 2
 teardown
 
 echo ""

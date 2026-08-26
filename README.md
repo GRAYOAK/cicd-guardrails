@@ -256,7 +256,7 @@ Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03-DEPENDENCY-CHAIN` leb
 - `global_excludes` — weitere `find -not -path` Muster (additiv zu den Defaults)
 - `validation_skip_paths` — relative Pfade, die zwar gefunden, aber **ohne** Manifest-/Lock-Policy geprüft werden (sinnvoll für reine Tooling-`pyproject.toml`-Verzeichnisse)
 - `package_policy.python` — partielles Überschreiben der im Guardrails-Repo mitgelieferten Python-Standardpolicy (`scripts/config/package_policy.defaults.yml`): `triggers` (welche Dateinamen ein Verzeichnis als Python-Projekt markieren), `satisfiers` (OR-Liste erlaubter Nachweis-Dateien nebenan), `allowed_trigger_combinations` (exakte erlaubte Trigger-Mengen bei mehr als einem Trigger gleichzeitig), `hash_validators` (Zuordnung Satisfier-Dateiname zu eingebautem Validator)
-- `package_policy.javascript` — partielles Überschreiben der JavaScript/TypeScript-Standardpolicy (`scripts/config/package_policy.javascript.defaults.yml`): `package.json` als Trigger, npm/Yarn/pnpm-Lockfiles als Satisfier, genau eine Lockfile-Familie im selben Verzeichnis sowie Manifest- und Integritätsvalidatoren
+- `package_policy.javascript` — partielles Überschreiben der JavaScript/TypeScript-Standardpolicy (`scripts/config/package_policy.javascript.defaults.yml`): exakt `package.json`, `tsconfig.json` und `jsconfig.json` als Trigger (nicht z. B. `tsconfig.app.json`), npm/Yarn/pnpm-Lockfiles als Satisfier, erlaubte Trigger-Kombinationen, genau eine Lockfile-Familie im selben Verzeichnis sowie Manifest- und Integritätsvalidatoren
 
 Merge-Verhalten: Ohne `yq` werden die mitgelieferten Default-Dateien unverändert verwendet. Mit `yq` werden die jeweiligen `package_policy.python`- bzw. `package_policy.javascript`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
 
@@ -457,8 +457,10 @@ Aktuelle Sprachmodule:
 
 Das unterstützt Repositories mit einem Service im Root und Monorepos mit vielen verschachtelten Services.
 
-Für JavaScript/TypeScript gilt pro `package.json`-Verzeichnis:
+Für JavaScript/TypeScript gilt pro Projektverzeichnis:
 
+- Exakt `tsconfig.json` und `jsconfig.json` markieren zusätzlich ein Projekt; Varianten wie `tsconfig.app.json` werden nicht als Trigger ausgewertet.
+- Liegt einer dieser Config-Trigger ohne `package.json` im selben Verzeichnis, schlägt der Check fehl. Erlaubt sind `package.json` allein sowie `package.json` mit genau `tsconfig.json` oder `jsconfig.json`.
 - genau eine Lockfile-Familie: `package-lock.json`, `yarn.lock` (Classic oder Berry) oder `pnpm-lock.yaml`; kein Workspace-Root-Walk-up
 - exakte SemVer-Pins in `dependencies`, `devDependencies` und `optionalDependencies`; `peerDependencies` dürfen Ranges behalten
 - erlaubt sind außerdem `file:`, `link:`, `workspace:`, exakte `npm:`-Aliase sowie Git-/URL-Referenzen mit vollständigem 40-stelligem Commit-SHA

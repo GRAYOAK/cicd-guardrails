@@ -222,18 +222,63 @@ sec03__run_js_hash_validator() {
   esac
 }
 
+sec03__javascript_trigger_combo_allowed() {
+  local path_root="$1"
+  local dir="$2"
+  shift 2
+  local -a triggers=("$@")
+  local trigger_key combo
+  trigger_key="$(printf '%s\n' "${triggers[@]}" | sort -u | paste -sd' ' -)"
+  while IFS= read -r combo; do
+    [[ -z "$combo" ]] && continue
+    [[ "$trigger_key" == "$combo" ]] && return 0
+  done < <(pp_javascript_allowed_combo_sorted_space_lines)
+
+  local rel_probe
+  rel_probe="$(pkg_rel_path "$path_root" "${dir}/${triggers[0]}")"
+  fb_report "error" "Ambiguous JavaScript/TypeScript project triggers in one directory: ${triggers[*]}." "$rel_probe" "" \
+    "Keep one allowed trigger combination: package.json alone, tsconfig.json with package.json, or jsconfig.json with package.json." "js_ts"
+  return 1
+}
+
 cicd_sec_03_run_javascript_package_policy() {
   local path_root="$1"
-  local trigger manifest rel
-  while IFS= read -r trigger; do
-    [[ -z "$trigger" ]] && continue
-    while IFS= read -r manifest; do
-      [[ -z "$manifest" || ! -f "$manifest" ]] && continue
-      rel="$(pkg_rel_path "$path_root" "$manifest")"
-      fp_should_skip_validation "$rel" && continue
-      cicd_sec_03_audit_js_ts_package_json "$path_root" "$manifest" || true
-    done < <(fp_find_with_names "$path_root" "$trigger")
-  done < <(pp_javascript_trigger_names)
+  local -a project_dirs=()
+  while IFS= read -r dir; do
+    [[ -n "$dir" ]] && project_dirs+=("$dir")
+  done < <(
+    local trigger artifact rel
+    while IFS= read -r trigger; do
+      [[ -z "$trigger" ]] && continue
+      while IFS= read -r artifact; do
+        [[ -z "$artifact" || ! -f "$artifact" ]] && continue
+        rel="$(pkg_rel_path "$path_root" "$artifact")"
+        fp_should_skip_validation "$rel" && continue
+        dirname "$artifact"
+      done < <(fp_find_with_names "$path_root" "$trigger")
+    done < <(pp_javascript_trigger_names) | sort -u
+  )
+
+  local dir
+  for dir in "${project_dirs[@]+"${project_dirs[@]}"}"; do
+    local -a triggers=()
+    local trigger
+    while IFS= read -r trigger; do
+      [[ -n "$trigger" && -f "${dir}/${trigger}" ]] && triggers+=("$trigger")
+    done < <(pp_javascript_trigger_names | sort -u)
+    ((${#triggers[@]} == 0)) && continue
+
+    if [[ ! -f "${dir}/package.json" ]]; then
+      local rel_trigger
+      rel_trigger="$(pkg_rel_path "$path_root" "${dir}/${triggers[0]}")"
+      fb_report "error" "JavaScript/TypeScript project is missing package.json beside ${triggers[0]}." "$rel_trigger" "" \
+        "Add package.json beside the project config, then generate and commit exactly one supported lockfile in the same directory." "js_ts"
+      continue
+    fi
+
+    sec03__javascript_trigger_combo_allowed "$path_root" "$dir" "${triggers[@]}" || true
+    cicd_sec_03_audit_js_ts_package_json "$path_root" "${dir}/package.json" || true
+  done
 }
 
 cicd_sec_03_audit_js_ts_package_json() {

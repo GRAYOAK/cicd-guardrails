@@ -103,6 +103,26 @@ pp__awk_validator_value() {
   ' "$mf"
 }
 
+pp__awk_nested_string_lists() {
+  local mf="$1"
+  local key="$2"
+  awk -v key="$key" '
+    $0 ~ "^" key ":" { g = 1; next }
+    g && /^[a-zA-Z@]/ && $0 !~ /^  / { exit }
+    g && /^  - - / {
+      if (combo != "") print combo
+      sub(/^  - - /, "", $0)
+      combo = $0
+      next
+    }
+    g && /^    - / {
+      sub(/^    - /, "", $0)
+      combo = combo " " $0
+    }
+    END { if (combo != "") print combo }
+  ' "$mf"
+}
+
 pp_python_trigger_names() {
   local mf
   mf="$(pp_python_merged_file)"
@@ -157,6 +177,34 @@ pp_javascript_satisfier_names() {
   else
     pp__awk_string_list "$mf" "satisfiers"
   fi
+}
+
+pp_javascript_allowed_combo_sorted_space_lines() {
+  local mf
+  mf="$(pp_javascript_merged_file)"
+  [[ -z "$mf" || ! -f "$mf" ]] && return 0
+  if command -v yq >/dev/null 2>&1; then
+    local json_lines
+    if ! json_lines="$(yq -o=json -I=0 '(.allowed_trigger_combinations // [])[]' "$mf" 2>/dev/null)"; then
+      pp_javascript_allowed_combo_sorted_space_lines_fallback "$mf"
+      return 0
+    fi
+    while IFS= read -r j; do
+      [[ -z "$j" || "$j" == "null" ]] && continue
+      python3 -c 'import json,sys; print(" ".join(sorted(json.loads(sys.argv[1]))))' "$j" 2>/dev/null || true
+    done <<<"$json_lines"
+  else
+    pp_javascript_allowed_combo_sorted_space_lines_fallback "$mf"
+  fi
+}
+
+pp_javascript_allowed_combo_sorted_space_lines_fallback() {
+  local mf="$1"
+  local combo
+  while IFS= read -r combo; do
+    [[ -z "$combo" ]] && continue
+    python3 -c 'import sys; print(" ".join(sorted(sys.argv[1].split())))' "$combo"
+  done < <(pp__awk_nested_string_lists "$mf" "allowed_trigger_combinations")
 }
 
 pp_javascript_validator_for() {

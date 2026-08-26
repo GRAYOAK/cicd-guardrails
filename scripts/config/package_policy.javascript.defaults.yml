@@ -3,11 +3,18 @@
 
 triggers:
   - package.json
+  - tsconfig.json
+  - jsconfig.json
 satisfiers:
   - package-lock.json
   - yarn.lock
   - pnpm-lock.yaml
-allowed_trigger_combinations: []
+allowed_trigger_combinations:
+  - - package.json
+  - - tsconfig.json
+    - package.json
+  - - jsconfig.json
+    - package.json
 allowed_satisfier_combinations:
   - - package-lock.json
   - - yarn.lock

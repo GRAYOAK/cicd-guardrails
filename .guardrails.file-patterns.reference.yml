@@ -7,6 +7,8 @@
 # policy_handler / artifact        implementation (relative to guardrails repo)
 # ---------------------------------------------------------------------------
 # js_ts / package.json             package_policy.javascript + scripts/checks/domain/package/js_ts.sh
+# js_ts / tsconfig.json            same — exact TypeScript project trigger
+# js_ts / jsconfig.json            same — exact JavaScript project trigger
 # js_ts / package-lock.json        same — cicd_sec_03_audit_js_ts_lock_package_lock
 # js_ts / yarn.lock                same — cicd_sec_03_audit_js_ts_lock_yarn
 # js_ts / pnpm-lock.yaml           same — cicd_sec_03_audit_js_ts_lock_pnpm
@@ -63,11 +65,18 @@ package_policy:
   javascript:
     triggers:
       - package.json
+      - tsconfig.json
+      - jsconfig.json
     satisfiers:
       - package-lock.json
       - yarn.lock
       - pnpm-lock.yaml
-    allowed_trigger_combinations: []
+    allowed_trigger_combinations:
+      - - package.json
+      - - tsconfig.json
+        - package.json
+      - - jsconfig.json
+        - package.json
     allowed_satisfier_combinations:
       - - package-lock.json
       - - yarn.lock

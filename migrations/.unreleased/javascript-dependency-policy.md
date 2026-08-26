@@ -8,15 +8,17 @@ affected_consumers: [reusable-workflow, pre-commit, cli]
 
 ## What changed
 
-`CICD-SEC-03-DEPENDENCY-CHAIN` now fails JavaScript and TypeScript projects that use mutable dependency specs, have no same-directory lockfile, mix lockfile families, or lack package-manager integrity evidence.
+`CICD-SEC-03-DEPENDENCY-CHAIN` now detects project directories through exact `package.json`, `tsconfig.json`, and `jsconfig.json` basenames. A lone TypeScript or JavaScript config fails until `package.json` and one same-directory lockfile family exist; configured directories then receive the existing immutable-spec and lock-integrity checks once.
 
 ## Why
 
-Exact manifest specs and integrity-bearing npm, Yarn, or pnpm lockfiles make dependency resolution reproducible and reduce dependency-chain substitution risk.
+Config-only TypeScript and JavaScript directories previously escaped dependency validation. Detecting their standard project configs closes that gap, while exact basenames avoid treating specialized files such as `tsconfig.app.json` as separate projects.
 
 ## Required action for consumer repos
 
 - Choose npm, Yarn, or pnpm for every `package.json` directory and keep exactly that lockfile beside the manifest.
+- Add `package.json` and one supported lockfile beside every `tsconfig.json` or `jsconfig.json`, or remove configs that do not represent a project.
+- If `.guardrails.file-patterns.yml` overrides `package_policy.javascript.allowed_trigger_combinations` (including the former default `[]`), remove that override to inherit the new defaults or replace it with the complete combinations your repository permits.
 - Replace dependency ranges with exact versions and regenerate the lockfile with the selected package manager.
 
 ## Detection
