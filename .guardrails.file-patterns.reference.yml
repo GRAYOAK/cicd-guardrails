@@ -27,11 +27,21 @@
 
 version: 1
 # Mirror of built-in find excludes (consumer overlays add more; they do not replace these).
+# tests/test_checks.sh asserts this list stays identical to fp_default_excludes().
+# Generic output directory names (build/, dist/, out/) are intentionally absent because
+# they frequently hold reviewed source in real repositories.
 global_excludes:
-  - "*/.git/*"
-  - "*/node_modules/*"
-  - "*/.venv/*"
-  - "*/target/*"
+  - "*/.git/*"          # version control metadata
+  - "*/node_modules/*"  # installed npm/yarn/pnpm dependencies
+  - "*/.venv/*"         # Python virtualenv
+  - "*/target/*"        # Cargo / Maven build output
+  - "*/.next/*"         # Next.js build and dev output
+  - "*/.nuxt/*"         # Nuxt build output
+  - "*/.output/*"       # Nuxt 3 / Nitro build output
+  - "*/.turbo/*"        # Turborepo task cache
+  - "*/.cache/*"        # generic tool cache (Parcel, Gatsby, pip, …)
+  - "*/__pycache__/*"   # CPython bytecode cache
+  - "*/coverage/*"      # generated coverage reports (jest, nyc, pytest-cov)
 validation_skip_paths: []
 
 # Mirror of scripts/config/package_policy.defaults.yml (flat document == this key).

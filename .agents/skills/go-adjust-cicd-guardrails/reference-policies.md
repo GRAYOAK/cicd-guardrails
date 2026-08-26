@@ -37,7 +37,7 @@ Per-check overrides interact with these codes:
 Each check should produce:
 - GitHub annotations (`error`/`warning`/`notice`) for findings (emitted live, before any mode override is applied)
 - Step summary with designation, OWASP reference, status, mode, and counts
-- JSON result artifact (when `GUARDRAILS_RESULT_DIR` is set) for final aggregation, including `status` and `mode` fields so the aggregator can surface softened checks
+- JSON result artifact (when `GUARDRAILS_RESULT_DIR` is set) for final aggregation, including `status`, `mode`, and optional `duration_seconds` so the aggregator can surface softened checks and per-check runtime
 
 ## GitHub Actions runtime policy
 

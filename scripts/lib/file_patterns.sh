@@ -7,8 +7,21 @@ FP_CONFIG_PATH=""
 FP_VALIDATION_SKIP_PATHS=()
 FP_MERGED_EXCLUDES=()
 
+# Only unambiguously generated or vendored directories belong here. Names that can
+# legitimately hold reviewed source (build/, dist/, out/) stay in scope on purpose.
 fp_default_excludes() {
-  printf '%s\n' "*/.git/*" "*/node_modules/*" "*/.venv/*" "*/target/*"
+  printf '%s\n' \
+    "*/.git/*" \
+    "*/node_modules/*" \
+    "*/.venv/*" \
+    "*/target/*" \
+    "*/.next/*" \
+    "*/.nuxt/*" \
+    "*/.output/*" \
+    "*/.turbo/*" \
+    "*/.cache/*" \
+    "*/__pycache__/*" \
+    "*/coverage/*"
 }
 
 fp_init() {

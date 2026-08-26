@@ -128,7 +128,9 @@ Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designa
 
 Jeder Check schreibt neben **Searched** / **Found** / **Remediation** einen Abschnitt **Scan coverage** (englisch), der faktisch auflistet, was ausgewertet wurde (z. B. Dateianzahl, Stichproben von Pfaden, API-Kontext ohne Secrets). Über die Umgebungsvariable **`GUARDRAILS_COVERAGE`** steuerbar: `off` (kein Abschnitt), `compact` (Standard, begrenzte Pfadliste), `full` (mehr Pfade). Optional: **`GUARDRAILS_COVERAGE_MAX_PATHS`** überschreibt die Obergrenze für Pfad-Stichproben im `compact`-Modus.
 
-Die pro Job geschriebenen JSON-Ergebnisdateien enthalten zusätzlich **`scan_coverage_markdown`**. Der Job **Risk summary** (`scripts/aggregate_risk_summary.sh`) fügt daraus den Block **Per-check scan coverage** in die Markdown-Zusammenfassung ein. Im Modus **`full`** ist die Pfadliste weiterhin begrenzt (Standard 2000, über **`GUARDRAILS_COVERAGE_FULL_MAX_PATHS`** anpassbar), damit sehr große Monorepos stabil bleiben.
+Die pro Job geschriebenen JSON-Ergebnisdateien enthalten zusätzlich **`scan_coverage_markdown`** und **`duration_seconds`** (ganzzahlige Laufzeit ab Check-Start, `>= 0`). Der Job **Risk summary** (`scripts/aggregate_risk_summary.sh`) fügt daraus den Block **Per-check scan coverage** in die Markdown-Zusammenfassung ein und zeigt die Dauer neben dem Status. Im Modus **`full`** ist die Pfadliste weiterhin begrenzt (Standard 2000, über **`GUARDRAILS_COVERAGE_FULL_MAX_PATHS`** anpassbar), damit sehr große Monorepos stabil bleiben.
+
+Während eines Jobs erscheinen grobe Phasen im Log (kein Log je Datei): auf GitHub Actions als Notice (`::notice::<Designation> phase: <name>`), lokal auf stderr. Alle Checks loggen `start`; schwere Checks (vor allem SEC-03-DEPENDENCY-CHAIN und SEC-06-SECRET-SCAN) fügen wenige weitere Phasen hinzu.
 
 > **Migrationshinweis (Breaking Change):** Job-IDs und `skip-checks`-Tokens bleiben `cicd-sec-*`. **Display-Namen** (Scope-Emoji 🧩/⚙️, `Code |` / `Settings |`, Themen-Emoji, Text) müssen in Branch Protection exakt gematcht werden. Nach einem Workflow-Pin-Update ggf. Required-Checks anpassen. Mapping siehe Abschnitt [Branch Protection konfigurieren](#branch-protection-konfigurieren-prs-blockieren).
 
@@ -251,7 +253,11 @@ Fehlt die Datei, nutzt Guardrails konservative Defaults und schreibt das transpa
 
 #### Optional: Dateiscan-Overlay (`.guardrails.file-patterns.yml`)
 
-Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03-DEPENDENCY-CHAIN` leben in den Skripten; Consumer-Repos **müssen** keine Kopie pflegen. Optional kann das Ziel-Repo **zusätzliche** Einträge setzen:
+Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03-DEPENDENCY-CHAIN` leben in den Skripten; Consumer-Repos **müssen** keine Kopie pflegen.
+
+Eingebaute Ausschlüsse (gelten für alle Datei-Scans, also auch JS/TS, Python und das SEC-03-Inventar): `*/.git/*`, `*/node_modules/*`, `*/.venv/*`, `*/target/*`, `*/.next/*`, `*/.nuxt/*`, `*/.output/*`, `*/.turbo/*`, `*/.cache/*`, `*/__pycache__/*`, `*/coverage/*`. Bewusst **nicht** ausgeschlossen sind generische Namen wie `build/`, `dist/` oder `out/`, weil sie in echten Repos häufig gepflegten Quellcode enthalten.
+
+Optional kann das Ziel-Repo **zusätzliche** Einträge setzen:
 
 - `global_excludes` — weitere `find -not -path` Muster (additiv zu den Defaults)
 - `validation_skip_paths` — relative Pfade, die zwar gefunden, aber **ohne** Manifest-/Lock-Policy geprüft werden (sinnvoll für reine Tooling-`pyproject.toml`-Verzeichnisse)
@@ -260,7 +266,7 @@ Built-in `find`-Ausschlüsse und Handler für `CICD-SEC-03-DEPENDENCY-CHAIN` leb
 
 Merge-Verhalten: Ohne `yq` werden die mitgelieferten Default-Dateien unverändert verwendet. Mit `yq` werden die jeweiligen `package_policy.python`- bzw. `package_policy.javascript`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
 
-**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Ecosystem-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
+**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Ecosystem-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre `global_excludes`- sowie Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
 
 Schema: [`.guardrails.file-patterns.schema.json`](.guardrails.file-patterns.schema.json). Handler- und Dateizuordnung sowie das dokumentierte Default-Spiegelbild: [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml). Einlesen der Overlay-Datei im gescannten Repo erfolgt mit `yq`; fehlt `yq` oder die Overlay-Datei, bleiben die eingebauten Defaults aktiv (Python-Policy aus der Default-Datei, andere Ausschlüsse wie bisher).
 

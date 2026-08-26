@@ -208,6 +208,7 @@ sec03_phase_lockfiles() {
 
 sec03_phase_workflows_and_dockerfiles() {
   local wf df
+  fb_phase "workflows"
   for wf in "${SEC03_WORKFLOWS[@]}"; do
     [[ -z "$wf" || ! -f "$wf" ]] && continue
     local rel
@@ -218,6 +219,7 @@ sec03_phase_workflows_and_dockerfiles() {
     action_pin_scan_file "$PATH_ROOT" "$wf" "workflows" || true
   done
 
+  fb_phase "docker"
   for df in "${SEC03_DOCKERFILES[@]}"; do
     [[ -z "$df" || ! -f "$df" ]] && continue
     local rel
@@ -229,12 +231,17 @@ sec03_phase_workflows_and_dockerfiles() {
   done
 }
 
+fb_phase "inventory"
 sec03_collect_inventory
+fb_phase "python"
 sec03_phase_python_package_policy
+fb_phase "js"
 sec03_phase_manifests_and_requirements
+fb_phase "lockfiles"
 sec03_phase_lockfiles
 sec03_phase_workflows_and_dockerfiles
 
+fb_phase "summary"
 sec03__coverage_inventory "Manifest" "package.json" "${SEC03_PACKAGE_JSON[@]}"
 sec03__coverage_inventory "Manifest" "go.mod" "${SEC03_GO_MOD[@]}"
 sec03__coverage_inventory "Manifest" "Cargo.toml" "${SEC03_CARGO_TOML[@]}"

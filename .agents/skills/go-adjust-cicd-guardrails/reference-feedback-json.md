@@ -11,6 +11,9 @@ Downstream jobs (for example risk aggregation) read one JSON file per check. The
 - `check_id`, `title`, `status`, `mode`, `counts` (errors, warnings, notices), `owasp_reference`: stable identifiers and summary metadata.
 - `finding_detail_markdown`: grouped finding text when the check recorded structured rows (may be empty). Truncated before write when very large. `CICD-SEC-06-SECRET-SCAN` fills this via `fb_report` rows with ecosystem `gitleaks` (RuleID, path, line, short commit prefix only).
 - `scan_coverage_markdown`: factual evidence of what was evaluated (may be empty). Same truncation policy as the job summary block for this field.
+- `duration_seconds`: integer wall-clock seconds from `fb_init` to JSON write (`>= 0`). Optional for older artifacts; writers always emit it. The risk summary shows it next to status in **Per-check scan coverage** when present.
+
+Coarse progress (not a JSON field): `fb_phase "<name>"` emits a handful of job-log lines (`::notice::<CHECK_ID> phase: <name>` on GitHub Actions, the same text on stderr locally). Heavy checks add a few extra phases; other checks emit `start` from `fb_init` only. Never log per file.
 
 ## Human summary sections (order)
 
