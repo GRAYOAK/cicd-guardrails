@@ -59,7 +59,7 @@
       "description": "Optional per-check severity overrides. Default mode is 'fail'. Use 'warn' or 'off' for staged rollout.",
       "properties": {
         "CICD-SEC-01-FLOW": { "$ref": "#/$defs/checkOverride" },
-        "CICD-SEC-03-DEPENDENCY-CHAIN": { "$ref": "#/$defs/checkOverride" },
+        "CICD-SEC-03-DEPENDENCY-CHAIN": { "$ref": "#/$defs/sec03CheckOverride" },
         "CICD-SEC-04-POISONED-PIPELINE": { "$ref": "#/$defs/checkOverride" },
         "CICD-SEC-05-PERMISSIONS": { "$ref": "#/$defs/checkOverride" },
         "CICD-SEC-05-BRANCH": { "$ref": "#/$defs/checkOverride" },
@@ -81,6 +81,40 @@
           "description": "fail = exit non-zero on findings (default). warn = report findings but keep job green. off = skip the check entirely."
         }
       }
+    },
+    "sec03CheckOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["fail", "warn", "off"],
+          "description": "Check-wide mode. fail = exit non-zero on findings (default). warn = report findings but keep job green. off = skip SEC-03 entirely before inventory."
+        },
+        "ecosystems": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Per-ecosystem gates. Known IDs default to fail when omitted. Unknown IDs are ignored with a runtime notice.",
+          "properties": {
+            "javascript": { "$ref": "#/$defs/sec03EcosystemMode" },
+            "python": { "$ref": "#/$defs/sec03EcosystemMode" },
+            "go": { "$ref": "#/$defs/sec03EcosystemMode" },
+            "rust": { "$ref": "#/$defs/sec03EcosystemMode" },
+            "ruby": { "$ref": "#/$defs/sec03EcosystemMode" },
+            "php": { "$ref": "#/$defs/sec03EcosystemMode" }
+          }
+        },
+        "unsupported_ecosystems": {
+          "type": "string",
+          "enum": ["notice", "off"],
+          "description": "Controls notices for detected unsupported dependency ecosystems. Defaults to notice."
+        }
+      }
+    },
+    "sec03EcosystemMode": {
+      "type": "string",
+      "enum": ["fail", "off"],
+      "description": "fail = run this ecosystem audit (default). off = skip it and record the config skip in scan coverage."
     }
   }
 }

@@ -73,3 +73,85 @@ cfg_check_mode() {
     *) echo "$default" ;;
   esac
 }
+
+cfg__sec03_ecosystem_id_known() {
+  case "$1" in
+    javascript|python|go|rust|ruby|php) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+cfg__sec03_ecosystem_raw_value() {
+  local ecosystem_id="$1"
+
+  if ! cfg__sec03_ecosystem_id_known "$ecosystem_id" ||
+      ! cfg__file_available ||
+      ! cfg__yq_available; then
+    return 0
+  fi
+
+  yq -r ".checks[\"CICD-SEC-03-DEPENDENCY-CHAIN\"].ecosystems[\"${ecosystem_id}\"] | select(. != null) | tostring" \
+    "$CFG_PATH" 2>/dev/null || true
+}
+
+cfg_sec03_ecosystem_mode() {
+  local ecosystem_id="$1"
+  local default="fail"
+  local val
+
+  if ! cfg__sec03_ecosystem_id_known "$ecosystem_id"; then
+    echo "$default"
+    return 0
+  fi
+
+  val="$(cfg__sec03_ecosystem_raw_value "$ecosystem_id")"
+  case "$val" in
+    fail|off) echo "$val" ;;
+    *) echo "$default" ;;
+  esac
+}
+
+cfg_sec03_unsupported_mode() {
+  local default="notice"
+  local val
+
+  if ! cfg__file_available || ! cfg__yq_available; then
+    echo "$default"
+    return 0
+  fi
+
+  val="$(yq -r '.checks["CICD-SEC-03-DEPENDENCY-CHAIN"].unsupported_ecosystems | select(. != null) | tostring' \
+    "$CFG_PATH" 2>/dev/null || true)"
+  case "$val" in
+    notice|off) echo "$val" ;;
+    *) echo "$default" ;;
+  esac
+}
+
+cfg_sec03_unknown_ecosystem_keys() {
+  local ecosystem_id
+
+  if ! cfg__file_available || ! cfg__yq_available; then
+    return 0
+  fi
+
+  while IFS= read -r ecosystem_id; do
+    [[ -z "$ecosystem_id" ]] && continue
+    cfg__sec03_ecosystem_id_known "$ecosystem_id" || printf '%s\n' "$ecosystem_id"
+  done < <(
+    yq -r '(.checks["CICD-SEC-03-DEPENDENCY-CHAIN"].ecosystems // {}) | keys | .[]' \
+      "$CFG_PATH" 2>/dev/null || true
+  )
+}
+
+cfg_sec03_invalid_ecosystem_values() {
+  local ecosystem_id val
+
+  for ecosystem_id in javascript python go rust ruby php; do
+    val="$(cfg__sec03_ecosystem_raw_value "$ecosystem_id")"
+    case "$val" in
+      ""|fail|off) ;;
+      *) printf '%s=%s\n' "$ecosystem_id" "$val" ;;
+    esac
+  done
+}

@@ -14,6 +14,19 @@ context:
 #   warn = report findings, keep job green (migration mode)
 #   off  = skip the check entirely (use sparingly)
 checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    mode: fail
+    # Optional SEC-03 language gates. Omitted ecosystems default to fail.
+    # Valid IDs: javascript, python, go, rust, ruby, php.
+    ecosystems:
+      javascript: fail
+      python: fail
+      go: fail
+      rust: fail
+      ruby: fail
+      php: fail
+    # notice (default) reports detected Maven/Gradle/NuGet/Deno/Pipenv/Conda files.
+    unsupported_ecosystems: notice
   CICD-SEC-06-SECRET-SCAN:
     mode: fail
   CICD-SEC-08-ACTION-PINNING:

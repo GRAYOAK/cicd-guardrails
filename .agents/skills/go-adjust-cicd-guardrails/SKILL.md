@@ -127,6 +127,7 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
   - risk summary and context model
   - `.guardrails.yml` expected fields and schema linkage
   - per-check severity override pattern (`checks: { <DESIGNATION>: { mode: fail|warn|off } }`)
+  - SEC-03 per-ecosystem audit gates (`fail|off`) and unsupported-ecosystem notice control
 - `playbooks.md`:
   - common change patterns and consumer wiring rules
 - `reference-feedback-json.md` (this folder):

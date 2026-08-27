@@ -35,6 +35,16 @@ context:
   deployment_criticality: prod    # dev | prod | regulated
 
 checks:                           # optional, per-check severity override
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    mode: fail                    # whole-check fail (default) | warn | off
+    ecosystems:                   # language audit fail (default) | off
+      javascript: fail
+      python: fail
+      go: off
+      rust: fail
+      ruby: fail
+      php: fail
+    unsupported_ecosystems: notice # notice (default) | off
   CICD-SEC-08-ACTION-PINNING:
     mode: warn                    # fail (default) | warn | off
 ```
@@ -56,5 +66,9 @@ Implementation rules:
 - JSON artifacts include the mode (`"mode": "warn"`); the aggregator surfaces a softened-mode note in the executive snapshot when at least one result has a non-`fail` mode.
 - Score weighting is reused: `mode=warn` produces `WARN` status (60% weight), `mode=off` produces `SKIPPED` (0% weight). No additional scoring branches are needed.
 - `skip-checks` (workflow input) and `mode: off` are complementary, not equivalent: the former skips the whole job at the caller level; the latter runs the check, records SKIPPED status, and keeps annotations in logs for traceability.
+- SEC-03 per-ecosystem reads live only in `scripts/lib/config.sh`. The hardcoded allowlist is `javascript`, `python`, `go`, `rust`, `ruby`, `php`; do not derive it from `scripts/config/ecosystems.yml`.
+- SEC-03 ecosystem modes are only `fail|off` and default to `fail`. Unknown keys produce a notice and are ignored; invalid known values produce a notice and default to `fail`.
+- `unsupported_ecosystems` is `notice|off` and defaults to `notice`. Ecosystem gates never disable inventory, workflow pinning, or Dockerfile digest checks.
+- Check-wide `mode: off` still exits before SEC-03 inventory, while an ecosystem `off` records an explicit coverage line even when that language has no files.
 
 When adding a new check, register its designation as a property in the schema's `checks` block so IDE validation accepts overrides for it.

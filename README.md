@@ -268,7 +268,7 @@ Merge-Verhalten: Ohne `yq` werden die mitgelieferten Default-Dateien unveränder
 
 **Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Python-/JavaScript-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Go wird unabhängig vom Consumer-Overlay durch das Epic-Schema in [`scripts/config/ecosystems.yml`](scripts/config/ecosystems.yml) definiert. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre `global_excludes`- sowie Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
 
-SEC-03 baut mit einem repo-weiten Datei-Walk ein Basename-Inventar auf und startet einen Sprach-Checker nur, wenn mindestens ein konfigurierter Trigger vorhanden ist. Workflow-YAMLs werden separat und ausschließlich unter `.github/workflows` gesammelt. Das Scan-Coverage nennt ausgelassene Sprachen ausdrücklich. Erkannte `pom.xml`, `build.gradle`, `build.gradle.kts`, `*.csproj`, `*.fsproj`, `packages.lock.json`, `deno.json`, `Pipfile` und `environment.yml` erzeugen lediglich Notices; sie ändern den Exit-Code nicht.
+SEC-03 baut mit einem repo-weiten Datei-Walk ein Basename-Inventar auf und startet einen Sprach-Checker nur, wenn mindestens ein konfigurierter Trigger vorhanden ist und das Ökosystem nicht per `.guardrails.yml` abgeschaltet wurde. Workflow-YAMLs werden separat und ausschließlich unter `.github/workflows` gesammelt. Das Scan-Coverage nennt ausgelassene Sprachen ausdrücklich. Erkannte `pom.xml`, `build.gradle`, `build.gradle.kts`, `*.csproj`, `*.fsproj`, `packages.lock.json`, `deno.json`, `Pipfile` und `environment.yml` erzeugen standardmäßig lediglich Notices; sie ändern den Exit-Code nicht.
 
 Schema: [`.guardrails.file-patterns.schema.json`](.guardrails.file-patterns.schema.json). Handler- und Dateizuordnung sowie das dokumentierte Default-Spiegelbild: [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml). Einlesen der Overlay-Datei im gescannten Repo erfolgt mit `yq`; fehlt `yq` oder die Overlay-Datei, bleiben die eingebauten Defaults aktiv (Python-Policy aus der Default-Datei, andere Ausschlüsse wie bisher).
 
@@ -339,6 +339,29 @@ checks:
 ```
 
 Abgrenzung: `skip-checks` (Workflow-Input) gehört dem Caller und überspringt einen Check ganz; `mode: off` gehört dem Ziel-Repo und macht das gleiche, aber mit dokumentiertem Status im Summary. Beide Hebel sind unabhängig nutzbar.
+
+SEC-03 bietet darunter eigene Ökosystem-Schalter. Sie steuern nur die Paket-Audits; Inventar, Workflow-Pins und Dockerfile-Digests laufen weiter. Es gibt auf Ökosystem-Ebene bewusst keinen `warn`-Modus:
+
+```yaml
+# .guardrails.yml
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    mode: fail
+    ecosystems:
+      javascript: fail
+      python: fail
+      go: off
+      rust: fail
+      ruby: fail
+      php: fail
+    unsupported_ecosystems: off
+```
+
+- Erlaubte IDs sind `javascript`, `python`, `go`, `rust`, `ruby` und `php`; ausgelassene IDs laufen mit `fail`.
+- `off` überspringt den jeweiligen Sprach-Runner und wird im Scan-Coverage als „skipped by config“ sichtbar, auch wenn keine Dateien dieser Sprache existieren.
+- `unsupported_ecosystems` ist `notice` (Default) oder `off`; `off` unterdrückt Maven-/Gradle-/NuGet-/Deno-/Pipenv-/Conda-Hinweise.
+- Unbekannte IDs werden mit Notice ignoriert. Ungültige Werte für bekannte IDs erzeugen eine Notice und fallen sicher auf `fail` zurück.
+- Check-weites `mode: off` greift weiterhin vor dem Inventar; `skip-checks` bleibt ein separater Caller-Schalter.
 
 ### Final Summary lesen
 
