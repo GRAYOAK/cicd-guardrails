@@ -1,7 +1,7 @@
 # Human-readable documentation of effective file-scan defaults in this repository.
 # Runtime in consumer checkouts reads only `.guardrails.file-patterns.yml` when present;
-# built-in find excludes live in the guardrails scripts, and package policy defaults ship
-# in flat YAML files under scripts/config (mirrored under package_policy below).
+# built-in find excludes live in the guardrails scripts, and Python/JavaScript package
+# policy defaults ship in flat YAML files under scripts/config (mirrored below).
 # Do not require copying this file into consumer repositories.
 #
 # policy_handler / artifact        implementation (relative to guardrails repo)
@@ -14,8 +14,8 @@
 # js_ts / pnpm-lock.yaml           same — cicd_sec_03_audit_js_ts_lock_pnpm
 # js_ts / bun.lockb                same — nonempty_file validator
 # python / (directory policy)      scripts/config/package_policy.defaults.yml + scripts/lib/package_policy.sh + scripts/checks/domain/package/python.sh — cicd_sec_03_run_python_package_policy
-# go / go.mod                      package_policy.go + generic same-directory policy runner
-# go / go.sum                      same — nonempty_file validator
+# go / go.mod                      scripts/config/ecosystems.yml + schema-driven policy runner
+# go / go.sum                      same — not_empty rule
 # rust / Cargo.toml                scripts/checks/domain/package/rust.sh — cicd_sec_03_audit_rust_cargo_toml
 # rust / Cargo.lock                same — cicd_sec_03_audit_rust_cargo_lock
 # ruby / Gemfile                   scripts/checks/domain/package/ruby.sh — cicd_sec_03_audit_ruby_gemfile
@@ -100,13 +100,4 @@ package_policy:
       yarn.lock: yarn_lock_integrity
       pnpm-lock.yaml: pnpm_lock_integrity
       bun.lockb: nonempty_file
-  # Mirror of scripts/config/package_policy.go.defaults.yml.
-  go:
-    triggers:
-      - go.mod
-    satisfiers:
-      - go.sum
-    hash_validators:
-      go.sum: nonempty_file
-
 # Minimal overlay examples for consumer repos: see README (Dateiscan-Overlay).

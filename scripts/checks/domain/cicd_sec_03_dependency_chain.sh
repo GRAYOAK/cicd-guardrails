@@ -25,8 +25,6 @@ source "${PACKAGE_DIR}/js_ts.sh"
 source "${PACKAGE_DIR}/python.sh"
 # shellcheck source=scripts/checks/domain/package/policy_runner.sh
 source "${PACKAGE_DIR}/policy_runner.sh"
-# shellcheck source=scripts/checks/domain/package/go.sh
-source "${PACKAGE_DIR}/go.sh"
 # shellcheck source=scripts/checks/domain/package/rust.sh
 source "${PACKAGE_DIR}/rust.sh"
 # shellcheck source=scripts/checks/domain/package/ruby.sh
@@ -72,12 +70,12 @@ sec03_inventory_name_union() {
   pp_python_satisfier_names
   pp_javascript_trigger_names
   pp_javascript_satisfier_names
-  pp_go_trigger_names
-  pp_go_satisfier_names
+  ecosystem_policy_detect_names "go"
+  ecosystem_policy_file_names "go"
   printf '%s\n' \
     "Cargo.toml" "Cargo.lock" "Gemfile" "Gemfile.lock" "composer.json" "composer.lock" \
     "pom.xml" "build.gradle" "build.gradle.kts" "*.csproj" "*.fsproj" "packages.lock.json" \
-    "deno.json" "Pipfile" "environment.yml" "*.yml" "*.yaml" "Dockerfile" "Dockerfile.*"
+    "deno.json" "Pipfile" "environment.yml" "Dockerfile" "Dockerfile.*"
 }
 
 sec03_collect_inventory() {
@@ -93,10 +91,6 @@ sec03_collect_inventory() {
       SEC03_INVENTORY["$basename"]="$path"
     fi
 
-    if [[ "$path" == "${PATH_ROOT}/.github/workflows/"* && "$basename" == *.yml || \
-          "$path" == "${PATH_ROOT}/.github/workflows/"* && "$basename" == *.yaml ]]; then
-      SEC03_WORKFLOWS+=("$path")
-    fi
     case "$basename" in
       Dockerfile|Dockerfile.*) SEC03_DOCKERFILES+=("$path") ;;
       pom.xml|build.gradle|build.gradle.kts|*.csproj|*.fsproj|packages.lock.json|deno.json|Pipfile|environment.yml)
@@ -104,6 +98,7 @@ sec03_collect_inventory() {
         ;;
     esac
   done < <(fp_find_with_names "$PATH_ROOT" "${names[@]}")
+  mapfile -t SEC03_WORKFLOWS < <(fp_find_workflow_yamls)
 }
 
 sec03_inventory_paths() {
@@ -226,7 +221,7 @@ sec03_phase_python_package_policy() {
 sec03_phase_manifests_and_requirements() {
   local -a files=()
   local go_trigger_desc
-  go_trigger_desc="$(pp_go_trigger_names | paste -sd', ' -)"
+  go_trigger_desc="$(ecosystem_policy_detect_names "go" | paste -sd', ' -)"
   if sec03_inventory_has_names_from < <(pp_javascript_trigger_names); then
     mapfile -t files < <(sec03_inventory_paths_for_names < <(pp_javascript_trigger_names))
     cicd_sec_03_run_javascript_package_policy "$PATH_ROOT" "${files[@]+"${files[@]}"}" || true
@@ -234,11 +229,11 @@ sec03_phase_manifests_and_requirements() {
     fb_add_coverage "JavaScript/TypeScript package_policy: skipped; no configured trigger files found in inventory."
   fi
 
-  if sec03_inventory_has_names_from < <(pp_go_trigger_names); then
-    mapfile -t files < <(sec03_inventory_paths_for_names < <(pp_go_trigger_names))
-    cicd_sec_03_run_go_package_policy "$PATH_ROOT" "${files[@]+"${files[@]}"}" || true
+  if sec03_inventory_has_names_from < <(ecosystem_policy_detect_names "go"); then
+    mapfile -t files < <(sec03_inventory_paths_for_names < <(ecosystem_policy_detect_names "go"))
+    cicd_sec_03_run_ecosystem_policy "$PATH_ROOT" "go" "${files[@]+"${files[@]}"}" || true
   else
-    fb_add_coverage "Go package_policy: skipped; no configured trigger files (${go_trigger_desc:-none configured}) found in inventory."
+    fb_add_coverage "Go ecosystems.yml policy: skipped; no configured detection files (${go_trigger_desc:-none configured}) found in inventory."
   fi
 
   if sec03_inventory_has_any "Cargo.toml"; then

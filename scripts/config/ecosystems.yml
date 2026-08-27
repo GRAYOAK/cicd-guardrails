@@ -1,0 +1,17 @@
+# Schema-driven CICD-SEC-03 ecosystem policies.
+
+ecosystems:
+  go:
+    detect:
+      any_files: [go.mod]
+    files:
+      - name: go.mod
+        rules:
+          - require_sibling: [go.sum]
+            message: "Missing go.sum next to go.mod."
+            remediation: "Run go mod tidy and commit go.sum."
+      - name: go.sum
+        rules:
+          - not_empty: true
+            message: "go.sum is empty."
+            remediation: "Run go mod tidy and commit go.sum."

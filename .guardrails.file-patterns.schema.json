@@ -97,29 +97,6 @@
               "additionalProperties": { "type": "string", "minLength": 1 }
             }
           }
-        },
-        "go": {
-          "type": "object",
-          "description": "Partial merge over scripts/config/package_policy.go.defaults.yml. go.mod triggers require a same-directory go.sum by default.",
-          "additionalProperties": false,
-          "properties": {
-            "triggers": {
-              "type": "array",
-              "items": { "type": "string", "minLength": 1 },
-              "description": "Basenames that identify Go project directories."
-            },
-            "satisfiers": {
-              "type": "array",
-              "items": { "type": "string", "minLength": 1 },
-              "minItems": 1,
-              "description": "Basenames; at least one must exist beside each trigger."
-            },
-            "hash_validators": {
-              "type": "object",
-              "description": "Maps satisfier basename to a built-in validator id (nonempty_file).",
-              "additionalProperties": { "type": "string", "enum": ["nonempty_file"] }
-            }
-          }
         }
       }
     }

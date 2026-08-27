@@ -10,7 +10,6 @@ PP_DEFAULTS_YML="${PACKAGE_POLICY_LIB}/../config/package_policy.defaults.yml"
 PP_TARGET_ROOT=""
 PP_PYTHON_MERGED_TMP=""
 PP_JAVASCRIPT_MERGED_TMP=""
-PP_GO_MERGED_TMP=""
 
 pp_cleanup() {
   if [[ -n "${PP_PYTHON_MERGED_TMP:-}" && -f "$PP_PYTHON_MERGED_TMP" ]]; then
@@ -19,12 +18,8 @@ pp_cleanup() {
   if [[ -n "${PP_JAVASCRIPT_MERGED_TMP:-}" && -f "$PP_JAVASCRIPT_MERGED_TMP" ]]; then
     rm -f "$PP_JAVASCRIPT_MERGED_TMP"
   fi
-  if [[ -n "${PP_GO_MERGED_TMP:-}" && -f "$PP_GO_MERGED_TMP" ]]; then
-    rm -f "$PP_GO_MERGED_TMP"
-  fi
   PP_PYTHON_MERGED_TMP=""
   PP_JAVASCRIPT_MERGED_TMP=""
-  PP_GO_MERGED_TMP=""
 }
 
 pp__merge_policy() {
@@ -60,12 +55,6 @@ pp_init() {
     PP_JAVASCRIPT_MERGED_TMP="$(mktemp "${TMPDIR:-/tmp}/guardrails.pp.javascript.XXXXXX")"
     pp__merge_policy "$javascript_defaults" "javascript" "$PP_JAVASCRIPT_MERGED_TMP"
   fi
-
-  local go_defaults="${PACKAGE_POLICY_LIB}/../config/package_policy.go.defaults.yml"
-  if [[ -f "$go_defaults" ]]; then
-    PP_GO_MERGED_TMP="$(mktemp "${TMPDIR:-/tmp}/guardrails.pp.go.XXXXXX")"
-    pp__merge_policy "$go_defaults" "go" "$PP_GO_MERGED_TMP"
-  fi
 }
 
 pp_python_merged_file() {
@@ -79,14 +68,6 @@ pp_python_merged_file() {
 pp_javascript_merged_file() {
   if [[ -n "${PP_JAVASCRIPT_MERGED_TMP:-}" && -f "$PP_JAVASCRIPT_MERGED_TMP" ]]; then
     printf '%s' "$PP_JAVASCRIPT_MERGED_TMP"
-    return 0
-  fi
-  printf ''
-}
-
-pp_go_merged_file() {
-  if [[ -n "${PP_GO_MERGED_TMP:-}" && -f "$PP_GO_MERGED_TMP" ]]; then
-    printf '%s' "$PP_GO_MERGED_TMP"
     return 0
   fi
   printf ''
@@ -238,36 +219,6 @@ pp_javascript_validator_for() {
   local basename="$1"
   local mf
   mf="$(pp_javascript_merged_file)"
-  [[ -z "$mf" || ! -f "$mf" ]] && return 0
-  pp__validator_value "$mf" "$basename"
-}
-
-pp_go_trigger_names() {
-  local mf
-  mf="$(pp_go_merged_file)"
-  [[ -z "$mf" || ! -f "$mf" ]] && return 0
-  if command -v yq >/dev/null 2>&1; then
-    yq -r '(.triggers // [])[]' "$mf" 2>/dev/null || true
-  else
-    pp__awk_string_list "$mf" "triggers"
-  fi
-}
-
-pp_go_satisfier_names() {
-  local mf
-  mf="$(pp_go_merged_file)"
-  [[ -z "$mf" || ! -f "$mf" ]] && return 0
-  if command -v yq >/dev/null 2>&1; then
-    yq -r '(.satisfiers // [])[]' "$mf" 2>/dev/null || true
-  else
-    pp__awk_string_list "$mf" "satisfiers"
-  fi
-}
-
-pp_go_validator_for() {
-  local basename="$1"
-  local mf
-  mf="$(pp_go_merged_file)"
   [[ -z "$mf" || ! -f "$mf" ]] && return 0
   pp__validator_value "$mf" "$basename"
 }
