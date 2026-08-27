@@ -9,6 +9,7 @@ satisfiers:
   - package-lock.json
   - yarn.lock
   - pnpm-lock.yaml
+  - bun.lockb
 allowed_trigger_combinations:
   - - package.json
   - - tsconfig.json
@@ -19,8 +20,10 @@ allowed_satisfier_combinations:
   - - package-lock.json
   - - yarn.lock
   - - pnpm-lock.yaml
+  - - bun.lockb
 manifest_validator: package_json_exact_specs
 hash_validators:
   package-lock.json: npm_lock_integrity
   yarn.lock: yarn_lock_integrity
   pnpm-lock.yaml: pnpm_lock_integrity
+  bun.lockb: nonempty_file

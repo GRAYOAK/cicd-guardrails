@@ -115,7 +115,7 @@ Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designa
 | Designation | Job-ID | Skript | Scope | Was wird erkannt |
 |---|---|---|---|---|
 | `CICD-SEC-01-FLOW` | `cicd-sec-01-flow` | `scripts/checks/domain/cicd_sec_01_flow.sh` | Settings | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
-| `CICD-SEC-03-DEPENDENCY-CHAIN` | `cicd-sec-03-dependency-chain` | `scripts/checks/domain/cicd_sec_03_dependency_chain.sh` | Code | Python und JavaScript/TypeScript: verzeichnisbasierte `package_policy` (Defaults + Overlay), exakte Dependency-Pins und Lockfile-Integrität; Workflow-`uses:`-SHA-Pins; Dockerfile-Digests |
+| `CICD-SEC-03-DEPENDENCY-CHAIN` | `cicd-sec-03-dependency-chain` | `scripts/checks/domain/cicd_sec_03_dependency_chain.sh` | Code | Inventar-gesteuerte Package-Prüfung: Python und JavaScript/TypeScript/Bun (`package_policy`), Go (`ecosystems.yml`), Rust, Ruby und PHP; Hinweise für erkannte nicht unterstützte Ökosysteme; Workflow-`uses:`-SHA-Pins; Dockerfile-Digests |
 | `CICD-SEC-04-POISONED-PIPELINE` | `cicd-sec-04-poisoned-pipeline` | `scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh` | Code | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
 | `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Code | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
 | `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Settings | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
@@ -262,11 +262,13 @@ Optional kann das Ziel-Repo **zusätzliche** Einträge setzen:
 - `global_excludes` — weitere `find -not -path` Muster (additiv zu den Defaults)
 - `validation_skip_paths` — relative Pfade, die zwar gefunden, aber **ohne** Manifest-/Lock-Policy geprüft werden (sinnvoll für reine Tooling-`pyproject.toml`-Verzeichnisse)
 - `package_policy.python` — partielles Überschreiben der im Guardrails-Repo mitgelieferten Python-Standardpolicy (`scripts/config/package_policy.defaults.yml`): `triggers` (welche Dateinamen ein Verzeichnis als Python-Projekt markieren), `satisfiers` (OR-Liste erlaubter Nachweis-Dateien nebenan), `allowed_trigger_combinations` (exakte erlaubte Trigger-Mengen bei mehr als einem Trigger gleichzeitig), `hash_validators` (Zuordnung Satisfier-Dateiname zu eingebautem Validator)
-- `package_policy.javascript` — partielles Überschreiben der JavaScript/TypeScript-Standardpolicy (`scripts/config/package_policy.javascript.defaults.yml`): exakt `package.json`, `tsconfig.json` und `jsconfig.json` als Trigger (nicht z. B. `tsconfig.app.json`), npm/Yarn/pnpm-Lockfiles als Satisfier, erlaubte Trigger-Kombinationen, genau eine Lockfile-Familie im selben Verzeichnis sowie Manifest- und Integritätsvalidatoren
+- `package_policy.javascript` — partielles Überschreiben der JavaScript/TypeScript-Standardpolicy (`scripts/config/package_policy.javascript.defaults.yml`): exakt `package.json`, `tsconfig.json` und `jsconfig.json` als Trigger (nicht z. B. `tsconfig.app.json`), npm/Yarn/pnpm/Bun-Lockfiles als Satisfier, erlaubte Trigger-Kombinationen, genau eine Lockfile-Familie im selben Verzeichnis sowie Manifest- und Integritätsvalidatoren
 
-Merge-Verhalten: Ohne `yq` werden die mitgelieferten Default-Dateien unverändert verwendet. Mit `yq` werden die jeweiligen `package_policy.python`- bzw. `package_policy.javascript`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
+Merge-Verhalten: Ohne `yq` werden die mitgelieferten Default-Dateien unverändert verwendet. Mit `yq` werden die jeweiligen `package_policy.python`- und `package_policy.javascript`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
 
-**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Ecosystem-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre `global_excludes`- sowie Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
+**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Python-/JavaScript-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Go wird unabhängig vom Consumer-Overlay durch das Epic-Schema in [`scripts/config/ecosystems.yml`](scripts/config/ecosystems.yml) definiert. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre `global_excludes`- sowie Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
+
+SEC-03 baut mit einem repo-weiten Datei-Walk ein Basename-Inventar auf und startet einen Sprach-Checker nur, wenn mindestens ein konfigurierter Trigger vorhanden ist. Workflow-YAMLs werden separat und ausschließlich unter `.github/workflows` gesammelt. Das Scan-Coverage nennt ausgelassene Sprachen ausdrücklich. Erkannte `pom.xml`, `build.gradle`, `build.gradle.kts`, `*.csproj`, `*.fsproj`, `packages.lock.json`, `deno.json`, `Pipfile` und `environment.yml` erzeugen lediglich Notices; sie ändern den Exit-Code nicht.
 
 Schema: [`.guardrails.file-patterns.schema.json`](.guardrails.file-patterns.schema.json). Handler- und Dateizuordnung sowie das dokumentierte Default-Spiegelbild: [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml). Einlesen der Overlay-Datei im gescannten Repo erfolgt mit `yq`; fehlt `yq` oder die Overlay-Datei, bleiben die eingebauten Defaults aktiv (Python-Policy aus der Default-Datei, andere Ausschlüsse wie bisher).
 
@@ -383,8 +385,9 @@ cicd-guardrails/
 │
 ├── scripts/
 │   ├── config/
+│   │   ├── ecosystems.yml                # Go Epic-Schema (Detection, Dateien, Regeln, Meldungen)
 │   │   ├── package_policy.defaults.yml   # Python CICD-SEC-03 Standardpolicy
-│   │   └── package_policy.javascript.defaults.yml # JS/TS Standardpolicy
+│   │   └── package_policy.javascript.defaults.yml # JS/TS/Bun Standardpolicy
 │   ├── checks/
 │   │   ├── domain/                       # Fachliche Startpunkte (cicd_sec_*)
 │   │   │   ├── cicd_sec_01_flow.sh
@@ -392,7 +395,7 @@ cicd-guardrails/
 │   │   │   ├── package/                  # Sprachmodule fuer CICD-SEC-03-DEPENDENCY-CHAIN (JS/Go/Rust/Ruby/PHP; Python Logik)
 │   │   │   │   ├── js_ts.sh
 │   │   │   │   ├── python.sh
-│   │   │   │   ├── go.sh
+│   │   │   │   ├── policy_runner.sh      # Schema-getriebener Ecosystem-Runner (Go)
 │   │   │   │   ├── rust.sh
 │   │   │   │   ├── ruby.sh
 │   │   │   │   └── php.sh
@@ -456,7 +459,7 @@ Aktuelle Sprachmodule:
 
 - `scripts/checks/domain/package/js_ts.sh`
 - `scripts/checks/domain/package/python.sh`
-- `scripts/checks/domain/package/go.sh`
+- `scripts/checks/domain/package/policy_runner.sh` (liest Detection, Regeln, Meldungen und Remediation aus `scripts/config/ecosystems.yml`)
 - `scripts/checks/domain/package/rust.sh`
 - `scripts/checks/domain/package/ruby.sh`
 - `scripts/checks/domain/package/php.sh`
@@ -471,6 +474,9 @@ Für JavaScript/TypeScript gilt pro Projektverzeichnis:
 - exakte SemVer-Pins in `dependencies`, `devDependencies` und `optionalDependencies`; `peerDependencies` dürfen Ranges behalten
 - erlaubt sind außerdem `file:`, `link:`, `workspace:`, exakte `npm:`-Aliase sowie Git-/URL-Referenzen mit vollständigem 40-stelligem Commit-SHA
 - npm-v2/v3-Integrität, Yarn-v1-Integrity bzw. Yarn-Berry-Checksums und pnpm-Integrity werden geprüft
+- `bun.lockb` bleibt Teil der JavaScript-Policy und muss nicht leer sein
+
+Go nutzt das Epic-Schema unter `scripts/config/ecosystems.yml`: `detect.any_files` aktiviert den Audit nur bei `go.mod`; die Regeln `require_sibling` und `not_empty` prüfen eine gleichverzeichnisige, nicht leere `go.sum`. `message` und `remediation` kommen direkt aus YAML. Ohne `go.mod` wird kein Go-Audit ausgeführt.
 
 ---
 

@@ -103,6 +103,18 @@ pp__awk_validator_value() {
   ' "$mf"
 }
 
+pp__validator_value() {
+  local mf="$1"
+  local basename="$2"
+  if command -v yq >/dev/null 2>&1; then
+    export PP_LOOKUP_BASENAME="$basename"
+    yq -r '.hash_validators[strenv(PP_LOOKUP_BASENAME)] // ""' "$mf" 2>/dev/null || true
+    unset PP_LOOKUP_BASENAME
+  else
+    pp__awk_validator_value "$mf" "$basename"
+  fi
+}
+
 pp__awk_nested_string_lists() {
   local mf="$1"
   local key="$2"
@@ -150,11 +162,7 @@ pp_python_validator_for() {
   local mf
   mf="$(pp_python_merged_file)"
   [[ -z "$mf" || ! -f "$mf" ]] && return 0
-  if command -v yq >/dev/null 2>&1; then
-    yq -r ".hash_validators[\"${basename}\"] // \"\"" "$mf" 2>/dev/null || true
-  else
-    pp__awk_validator_value "$mf" "$basename"
-  fi
+  pp__validator_value "$mf" "$basename"
 }
 
 pp_javascript_trigger_names() {
@@ -212,9 +220,5 @@ pp_javascript_validator_for() {
   local mf
   mf="$(pp_javascript_merged_file)"
   [[ -z "$mf" || ! -f "$mf" ]] && return 0
-  if command -v yq >/dev/null 2>&1; then
-    yq -r ".hash_validators[\"${basename}\"] // \"\"" "$mf" 2>/dev/null || true
-  else
-    pp__awk_validator_value "$mf" "$basename"
-  fi
+  pp__validator_value "$mf" "$basename"
 }

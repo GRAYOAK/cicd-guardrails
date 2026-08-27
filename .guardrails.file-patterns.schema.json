@@ -58,7 +58,7 @@
         },
         "javascript": {
           "type": "object",
-          "description": "Partial merge over scripts/config/package_policy.javascript.defaults.yml. Exact package.json, tsconfig.json, and jsconfig.json basenames identify projects by default.",
+          "description": "Partial merge over scripts/config/package_policy.javascript.defaults.yml. Exact package.json, tsconfig.json, and jsconfig.json basenames identify projects by default; npm, Yarn, pnpm, and Bun lockfiles are supported.",
           "additionalProperties": false,
           "properties": {
             "triggers": {

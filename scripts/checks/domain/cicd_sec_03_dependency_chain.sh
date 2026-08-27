@@ -23,8 +23,8 @@ source "${ROOT_SCRIPTS_DIR}/lib/dockerfile_pin_audit.sh"
 source "${PACKAGE_DIR}/js_ts.sh"
 # shellcheck source=scripts/checks/domain/package/python.sh
 source "${PACKAGE_DIR}/python.sh"
-# shellcheck source=scripts/checks/domain/package/go.sh
-source "${PACKAGE_DIR}/go.sh"
+# shellcheck source=scripts/checks/domain/package/policy_runner.sh
+source "${PACKAGE_DIR}/policy_runner.sh"
 # shellcheck source=scripts/checks/domain/package/rust.sh
 source "${PACKAGE_DIR}/rust.sh"
 # shellcheck source=scripts/checks/domain/package/ruby.sh
@@ -55,58 +55,79 @@ fp_init "$PATH_ROOT"
 pp_init "$PATH_ROOT"
 trap pp_cleanup EXIT
 
-fb_add_searched "Python package_policy directories (triggers, satisfiers, hashes)"
-fb_add_searched "Package manifests and lockfiles (npm, pnpm, yarn, go, Cargo, Ruby, PHP)"
+fb_add_searched "Inventory-gated package policies (Python, JavaScript/TypeScript/Bun, Go, Rust, Ruby, PHP)"
+fb_add_searched "Unsupported dependency signals (Maven, Gradle, NuGet, Deno, Pipenv, Conda)"
 fb_add_searched "GitHub workflow YAML files for third-party action SHA pins"
 fb_add_searched "Dockerfiles for digest-pinned base images"
 
-declare -a SEC03_PACKAGE_JSON=()
-declare -a SEC03_GO_MOD=()
-declare -a SEC03_CARGO_TOML=()
-declare -a SEC03_GEMFILE=()
-declare -a SEC03_COMPOSER_JSON=()
-declare -a SEC03_PACKAGE_LOCK=()
-declare -a SEC03_YARN_LOCK=()
-declare -a SEC03_PNPM_LOCK=()
-declare -a SEC03_GO_SUM=()
-declare -a SEC03_CARGO_LOCK=()
-declare -a SEC03_GEMFILE_LOCK=()
-declare -a SEC03_COMPOSER_LOCK=()
+declare -A SEC03_INVENTORY=()
 declare -a SEC03_WORKFLOWS=()
 declare -a SEC03_DOCKERFILES=()
+declare -a SEC03_UNSUPPORTED=()
+
+sec03_inventory_name_union() {
+  pp_python_trigger_names
+  pp_python_satisfier_names
+  pp_javascript_trigger_names
+  pp_javascript_satisfier_names
+  ecosystem_policy_detect_names "go"
+  ecosystem_policy_file_names "go"
+  printf '%s\n' \
+    "Cargo.toml" "Cargo.lock" "Gemfile" "Gemfile.lock" "composer.json" "composer.lock" \
+    "pom.xml" "build.gradle" "build.gradle.kts" "*.csproj" "*.fsproj" "packages.lock.json" \
+    "deno.json" "Pipfile" "environment.yml" "Dockerfile" "Dockerfile.*"
+}
 
 sec03_collect_inventory() {
   local path basename
+  local -a names=()
+  mapfile -t names < <(sec03_inventory_name_union | sort -u)
   while IFS= read -r path; do
     [[ -z "$path" || ! -f "$path" ]] && continue
     basename="${path##*/}"
-    case "$basename" in
-      package.json) SEC03_PACKAGE_JSON+=("$path") ;;
-      go.mod) SEC03_GO_MOD+=("$path") ;;
-      Cargo.toml) SEC03_CARGO_TOML+=("$path") ;;
-      Gemfile) SEC03_GEMFILE+=("$path") ;;
-      composer.json) SEC03_COMPOSER_JSON+=("$path") ;;
-      package-lock.json) SEC03_PACKAGE_LOCK+=("$path") ;;
-      yarn.lock) SEC03_YARN_LOCK+=("$path") ;;
-      pnpm-lock.yaml) SEC03_PNPM_LOCK+=("$path") ;;
-      go.sum) SEC03_GO_SUM+=("$path") ;;
-      Cargo.lock) SEC03_CARGO_LOCK+=("$path") ;;
-      Gemfile.lock) SEC03_GEMFILE_LOCK+=("$path") ;;
-      composer.lock) SEC03_COMPOSER_LOCK+=("$path") ;;
-    esac
-  done < <(
-    fp_find_with_names "$PATH_ROOT" \
-      "package.json" "go.mod" "Cargo.toml" "Gemfile" "composer.json" \
-      "package-lock.json" "yarn.lock" "pnpm-lock.yaml" "go.sum" \
-      "Cargo.lock" "Gemfile.lock" "composer.lock"
-  )
+    if [[ -n "${SEC03_INVENTORY[$basename]+set}" ]]; then
+      SEC03_INVENTORY["$basename"]+=$'\n'"$path"
+    else
+      SEC03_INVENTORY["$basename"]="$path"
+    fi
 
-  while IFS= read -r path; do
-    [[ -n "$path" && -f "$path" ]] && SEC03_WORKFLOWS+=("$path")
-  done < <(fp_find_workflow_yamls)
-  while IFS= read -r path; do
-    [[ -n "$path" && -f "$path" ]] && SEC03_DOCKERFILES+=("$path")
-  done < <(fp_find_dockerfiles)
+    case "$basename" in
+      Dockerfile|Dockerfile.*) SEC03_DOCKERFILES+=("$path") ;;
+      pom.xml|build.gradle|build.gradle.kts|*.csproj|*.fsproj|packages.lock.json|deno.json|Pipfile|environment.yml)
+        SEC03_UNSUPPORTED+=("$path")
+        ;;
+    esac
+  done < <(fp_find_with_names "$PATH_ROOT" "${names[@]}")
+  mapfile -t SEC03_WORKFLOWS < <(fp_find_workflow_yamls)
+}
+
+sec03_inventory_paths() {
+  local basename="$1"
+  [[ -n "${SEC03_INVENTORY[$basename]+set}" ]] || return 0
+  printf '%s\n' "${SEC03_INVENTORY[$basename]}"
+}
+
+sec03_inventory_has_any() {
+  local basename
+  for basename in "$@"; do
+    [[ -n "${SEC03_INVENTORY[$basename]+set}" ]] && return 0
+  done
+  return 1
+}
+
+sec03_inventory_has_names_from() {
+  local name
+  while IFS= read -r name; do
+    [[ -n "$name" && -n "${SEC03_INVENTORY[$name]+set}" ]] && return 0
+  done
+  return 1
+}
+
+sec03_inventory_paths_for_names() {
+  local name
+  while IFS= read -r name; do
+    [[ -n "$name" ]] && sec03_inventory_paths "$name"
+  done
 }
 
 sec03__coverage_inventory() {
@@ -188,22 +209,80 @@ sec03_for_each_file() {
 }
 
 sec03_phase_python_package_policy() {
-  cicd_sec_03_run_python_package_policy "$PATH_ROOT" || true
+  if sec03_inventory_has_names_from < <(pp_python_trigger_names); then
+    local -a files=()
+    mapfile -t files < <(sec03_inventory_paths_for_names < <(pp_python_trigger_names))
+    cicd_sec_03_run_python_package_policy "$PATH_ROOT" "${files[@]+"${files[@]}"}" || true
+  else
+    fb_add_coverage "Python package_policy: skipped; no configured trigger files found in inventory."
+  fi
 }
 
 sec03_phase_manifests_and_requirements() {
-  cicd_sec_03_run_javascript_package_policy "$PATH_ROOT" --files "${SEC03_PACKAGE_JSON[@]}" || true
-  sec03_for_each_file cicd_sec_03_audit_go_mod "${SEC03_GO_MOD[@]}"
-  sec03_for_each_file cicd_sec_03_audit_rust_cargo_toml "${SEC03_CARGO_TOML[@]}"
-  sec03_for_each_file cicd_sec_03_audit_ruby_gemfile "${SEC03_GEMFILE[@]}"
-  sec03_for_each_file cicd_sec_03_audit_php_composer_json "${SEC03_COMPOSER_JSON[@]}"
+  local -a files=()
+  local go_trigger_desc
+  go_trigger_desc="$(ecosystem_policy_detect_names "go" | paste -sd', ' -)"
+  if sec03_inventory_has_names_from < <(pp_javascript_trigger_names); then
+    mapfile -t files < <(sec03_inventory_paths_for_names < <(pp_javascript_trigger_names))
+    cicd_sec_03_run_javascript_package_policy "$PATH_ROOT" "${files[@]+"${files[@]}"}" || true
+  else
+    fb_add_coverage "JavaScript/TypeScript package_policy: skipped; no configured trigger files found in inventory."
+  fi
+
+  if sec03_inventory_has_names_from < <(ecosystem_policy_detect_names "go"); then
+    mapfile -t files < <(sec03_inventory_paths_for_names < <(ecosystem_policy_detect_names "go"))
+    cicd_sec_03_run_ecosystem_policy "$PATH_ROOT" "go" "${files[@]+"${files[@]}"}" || true
+  else
+    fb_add_coverage "Go ecosystems.yml policy: skipped; no configured detection files (${go_trigger_desc:-none configured}) found in inventory."
+  fi
+
+  if sec03_inventory_has_any "Cargo.toml"; then
+    mapfile -t files < <(sec03_inventory_paths "Cargo.toml")
+    sec03_for_each_file cicd_sec_03_audit_rust_cargo_toml "${files[@]+"${files[@]}"}"
+    mapfile -t files < <(sec03_inventory_paths "Cargo.lock")
+    sec03_for_each_file cicd_sec_03_audit_rust_cargo_lock "${files[@]+"${files[@]}"}"
+  else
+    fb_add_coverage "Rust package audit: skipped; no Cargo.toml found in inventory."
+  fi
+
+  if sec03_inventory_has_any "Gemfile"; then
+    mapfile -t files < <(sec03_inventory_paths "Gemfile")
+    sec03_for_each_file cicd_sec_03_audit_ruby_gemfile "${files[@]+"${files[@]}"}"
+    mapfile -t files < <(sec03_inventory_paths "Gemfile.lock")
+    sec03_for_each_file cicd_sec_03_audit_ruby_gemfile_lock "${files[@]+"${files[@]}"}"
+  else
+    fb_add_coverage "Ruby package audit: skipped; no Gemfile found in inventory."
+  fi
+
+  if sec03_inventory_has_any "composer.json"; then
+    mapfile -t files < <(sec03_inventory_paths "composer.json")
+    sec03_for_each_file cicd_sec_03_audit_php_composer_json "${files[@]+"${files[@]}"}"
+    mapfile -t files < <(sec03_inventory_paths "composer.lock")
+    sec03_for_each_file cicd_sec_03_audit_php_composer_lock "${files[@]+"${files[@]}"}"
+  else
+    fb_add_coverage "PHP package audit: skipped; no composer.json found in inventory."
+  fi
 }
 
-sec03_phase_lockfiles() {
-  sec03_for_each_file cicd_sec_03_audit_go_sum "${SEC03_GO_SUM[@]}"
-  sec03_for_each_file cicd_sec_03_audit_rust_cargo_lock "${SEC03_CARGO_LOCK[@]}"
-  sec03_for_each_file cicd_sec_03_audit_ruby_gemfile_lock "${SEC03_GEMFILE_LOCK[@]}"
-  sec03_for_each_file cicd_sec_03_audit_php_composer_lock "${SEC03_COMPOSER_LOCK[@]}"
+sec03_phase_unsupported_ecosystems() {
+  local path rel basename ecosystem
+  for path in "${SEC03_UNSUPPORTED[@]+"${SEC03_UNSUPPORTED[@]}"}"; do
+    rel="$(fp_rel_path "$path")"
+    fp_should_skip_validation "$rel" && continue
+    basename="${path##*/}"
+    case "$basename" in
+      pom.xml) ecosystem="Maven" ;;
+      build.gradle|build.gradle.kts) ecosystem="Gradle" ;;
+      *.csproj|*.fsproj|packages.lock.json) ecosystem="NuGet" ;;
+      deno.json) ecosystem="Deno" ;;
+      Pipfile) ecosystem="Pipenv" ;;
+      environment.yml) ecosystem="Conda" ;;
+      *) continue ;;
+    esac
+    fb_report "notice" "Unsupported ${ecosystem} dependency signal '${basename}' detected; dependency policy validation was skipped." \
+      "$rel" "" "Review and pin ${ecosystem} dependencies with ecosystem-native tooling." "unsupported"
+  done
+  fb_add_coverage "Unsupported dependency signals: ${#SEC03_UNSUPPORTED[@]} file(s) detected; notices do not fail the check."
 }
 
 sec03_phase_workflows_and_dockerfiles() {
@@ -238,22 +317,22 @@ sec03_phase_python_package_policy
 fb_phase "js"
 sec03_phase_manifests_and_requirements
 fb_phase "lockfiles"
-sec03_phase_lockfiles
+fb_phase "unsupported"
+sec03_phase_unsupported_ecosystems
 sec03_phase_workflows_and_dockerfiles
 
 fb_phase "summary"
-sec03__coverage_inventory "Manifest" "package.json" "${SEC03_PACKAGE_JSON[@]}"
-sec03__coverage_inventory "Manifest" "go.mod" "${SEC03_GO_MOD[@]}"
-sec03__coverage_inventory "Manifest" "Cargo.toml" "${SEC03_CARGO_TOML[@]}"
-sec03__coverage_inventory "Manifest" "Gemfile" "${SEC03_GEMFILE[@]}"
-sec03__coverage_inventory "Manifest" "composer.json" "${SEC03_COMPOSER_JSON[@]}"
-sec03__coverage_inventory "Lock" "package-lock.json" "${SEC03_PACKAGE_LOCK[@]}"
-sec03__coverage_inventory "Lock" "yarn.lock" "${SEC03_YARN_LOCK[@]}"
-sec03__coverage_inventory "Lock" "pnpm-lock.yaml" "${SEC03_PNPM_LOCK[@]}"
-sec03__coverage_inventory "Lock" "go.sum" "${SEC03_GO_SUM[@]}"
-sec03__coverage_inventory "Lock" "Cargo.lock" "${SEC03_CARGO_LOCK[@]}"
-sec03__coverage_inventory "Lock" "Gemfile.lock" "${SEC03_GEMFILE_LOCK[@]}"
-sec03__coverage_inventory "Lock" "composer.lock" "${SEC03_COMPOSER_LOCK[@]}"
+for sec03_name in package.json go.mod Cargo.toml Gemfile composer.json package-lock.json yarn.lock pnpm-lock.yaml bun.lockb go.sum Cargo.lock Gemfile.lock composer.lock; do
+  mapfile -t sec03_files < <(sec03_inventory_paths "$sec03_name")
+  case "$sec03_name" in
+    package.json|go.mod|Cargo.toml|Gemfile|composer.json)
+      sec03__coverage_inventory "Manifest" "$sec03_name" "${sec03_files[@]+"${sec03_files[@]}"}"
+      ;;
+    *)
+      sec03__coverage_inventory "Lock" "$sec03_name" "${sec03_files[@]+"${sec03_files[@]}"}"
+      ;;
+  esac
+done
 sec03__coverage_workflows_and_dockerfiles
 
 fb_auto_status "$STRICT_MODE"
