@@ -45,6 +45,18 @@ assert_output_contains() {
   fi
 }
 
+assert_output_not_contains() {
+  local description="$1"
+  local unexpected="$2"
+  if [[ "$LAST_OUTPUT" != *"$unexpected"* ]]; then
+    echo "  ✅ $description"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ $description (unexpected '$unexpected')"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 assert_output_count() {
   local description="$1"
   local expected="$2"
@@ -939,16 +951,191 @@ if command -v yq >/dev/null 2>&1; then
   echo ""
   echo "▶ cicd_sec_03_dependency_chain.sh with mode=off"
   setup
-  echo '{"name":"demo"}' > "$TMP/package.json"
+  cat >"$TMP/go.mod" <<'EOF'
+module example.com/mode-off
+
+go 1.22
+EOF
   write_guardrails_yml "$TMP" "off" "CICD-SEC-03-DEPENDENCY-CHAIN"
+  cat >>"$TMP/.guardrails.yml" <<'EOF'
+    ecosystems:
+      go: fail
+EOF
   run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
   assert_exit "off override keeps job green" 0 "$LAST_EXIT"
   assert_output_contains "renders Mode off" "Mode: **off**"
   assert_output_contains "renders SKIPPED status" "Status: **SKIPPED**"
+  assert_output_not_contains "mode off suppresses Go findings before inventory" "Missing go.sum"
   teardown
 else
   echo ""
   echo "▶ skipping mode override tests (yq not available)"
+fi
+
+# ── SEC-03 per-ecosystem gates ────────────────────────────────────────────
+if command -v yq >/dev/null 2>&1; then
+  echo ""
+  echo "▶ SEC-03 disables Go while keeping the check active"
+  setup
+  cat >"$TMP/go.mod" <<'EOF'
+module example.com/go-off
+
+go 1.22
+EOF
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    ecosystems:
+      go: off
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "Go off keeps a broken Go-only repo green" 0 "$LAST_EXIT"
+  assert_output_not_contains "Go off suppresses the missing go.sum finding" "Missing go.sum"
+  assert_output_contains "Go off is visible in coverage" "Go skipped by config"
+  assert_output_not_contains "ecosystem off does not skip the whole check" "Status: **SKIPPED**"
+  teardown
+
+  echo ""
+  echo "▶ SEC-03 keeps Python active when Go is off"
+  setup
+  printf 'module example.com/go-off\n\ngo 1.22\n' >"$TMP/go.mod"
+  printf 'requests\n' >"$TMP/requirements.txt"
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    ecosystems:
+      go: off
+      python: fail
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "active Python still fails when Go is off" 1 "$LAST_EXIT"
+  assert_output_contains "Python finding remains active" "Unpinned python dependency 'requests'."
+  assert_output_not_contains "Go finding remains suppressed" "Missing go.sum"
+  assert_output_contains "mixed repo records Go config skip" "Go skipped by config"
+  teardown
+
+  echo ""
+  echo "▶ SEC-03 disables JavaScript by config"
+  setup
+  echo '{"name":"no-lock"}' >"$TMP/package.json"
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    ecosystems:
+      javascript: off
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "JavaScript off suppresses a missing lockfile" 0 "$LAST_EXIT"
+  assert_output_not_contains "JavaScript finding is absent" "JavaScript project is missing a lockfile"
+  assert_output_contains "JavaScript config skip uses public ecosystem name" "JavaScript skipped by config"
+  assert_output_not_contains "coverage does not expose internal js_ts name" "js_ts skipped by config"
+  teardown
+
+  echo ""
+  echo "▶ SEC-03 defaults missing ecosystem settings to fail"
+  setup
+  printf 'module example.com/default-go\n\ngo 1.22\n' >"$TMP/go.mod"
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    mode: fail
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "missing ecosystems map preserves Go failure" 1 "$LAST_EXIT"
+  assert_output_contains "default Go audit reports missing go.sum" "Missing go.sum next to go.mod."
+  teardown
+
+  echo ""
+  echo "▶ SEC-03 ignores unknown ecosystem keys with notice"
+  setup
+  echo '{"name":"green"}' >"$TMP/package.json"
+  write_empty_npm_lock "$TMP/package-lock.json"
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    ecosystems:
+      js_ts: off
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "unknown ecosystem key does not fail a green repo" 0 "$LAST_EXIT"
+  assert_output_contains "unknown ecosystem key emits notice" "Unknown SEC-03 ecosystem key 'js_ts'; ignoring it."
+  assert_output_not_contains "unknown key does not disable JavaScript" "JavaScript skipped by config"
+  teardown
+
+  echo ""
+  echo "▶ SEC-03 defaults invalid known ecosystem values to fail"
+  setup
+  printf 'module example.com/invalid-go\n\ngo 1.22\n' >"$TMP/go.mod"
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    ecosystems:
+      go: warn
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "invalid Go mode still runs failing audit" 1 "$LAST_EXIT"
+  assert_output_contains "invalid Go mode emits notice" "Invalid SEC-03 ecosystem mode 'warn' for 'go'; using default 'fail'."
+  assert_output_contains "invalid Go mode preserves finding" "Missing go.sum next to go.mod."
+  teardown
+
+  echo ""
+  echo "▶ SEC-03 disables unsupported ecosystem notices"
+  setup
+  echo '<project />' >"$TMP/pom.xml"
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    unsupported_ecosystems: off
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "unsupported ecosystems off keeps Maven-only repo green" 0 "$LAST_EXIT"
+  assert_output_not_contains "unsupported ecosystems off suppresses Maven notice" "Unsupported Maven"
+  assert_output_contains "unsupported config skip is visible" "Unsupported ecosystems skipped by config"
+  teardown
+
+  echo ""
+  echo "▶ SEC-03 disables Rust Ruby and PHP independently"
+  setup
+  printf '[package]\nname = "demo"\nversion = "0.1.0"\n' >"$TMP/Cargo.toml"
+  echo 'source "https://rubygems.org"' >"$TMP/Gemfile"
+  echo '{"name":"acme/demo"}' >"$TMP/composer.json"
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    ecosystems:
+      rust: off
+      ruby: off
+      php: off
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "three disabled lockfile audits keep repo green" 0 "$LAST_EXIT"
+  assert_output_not_contains "Rust lockfile finding is absent" "Missing Cargo.lock"
+  assert_output_not_contains "Ruby lockfile finding is absent" "Missing Gemfile.lock"
+  assert_output_not_contains "PHP lockfile finding is absent" "Missing composer.lock"
+  assert_output_contains "Rust skip is visible" "Rust skipped by config"
+  assert_output_contains "Ruby skip is visible" "Ruby skipped by config"
+  assert_output_contains "PHP skip is visible" "PHP skipped by config"
+  teardown
+
+  echo ""
+  echo "▶ SEC-03 Go gate does not affect workflow pinning"
+  setup
+  printf 'module example.com/go-off\n\ngo 1.22\n' >"$TMP/go.mod"
+  cp "$FIXTURES_DIR/bad-pinning.yml" "$TMP/.github/workflows/ci.yml"
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    ecosystems:
+      go: off
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "unpinned workflow still fails when Go is off" 1 "$LAST_EXIT"
+  assert_output_contains "Go skip remains visible beside workflow finding" "Go skipped by config"
+  assert_output_contains "workflow action finding remains active" "actions/checkout@v4"
+  teardown
+else
+  echo ""
+  echo "▶ skipping SEC-03 ecosystem gate tests (yq not available)"
 fi
 
 echo ""
