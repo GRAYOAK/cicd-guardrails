@@ -19,18 +19,10 @@ source "${ROOT_SCRIPTS_DIR}/lib/package_policy.sh"
 source "${ROOT_SCRIPTS_DIR}/lib/action_pin_audit.sh"
 # shellcheck source=scripts/lib/dockerfile_pin_audit.sh
 source "${ROOT_SCRIPTS_DIR}/lib/dockerfile_pin_audit.sh"
-# shellcheck source=scripts/checks/domain/package/js_ts.sh
-source "${PACKAGE_DIR}/js_ts.sh"
-# shellcheck source=scripts/checks/domain/package/python.sh
-source "${PACKAGE_DIR}/python.sh"
+# shellcheck source=scripts/checks/domain/package/validators.sh
+source "${PACKAGE_DIR}/validators.sh"
 # shellcheck source=scripts/checks/domain/package/policy_runner.sh
 source "${PACKAGE_DIR}/policy_runner.sh"
-# shellcheck source=scripts/checks/domain/package/rust.sh
-source "${PACKAGE_DIR}/rust.sh"
-# shellcheck source=scripts/checks/domain/package/ruby.sh
-source "${PACKAGE_DIR}/ruby.sh"
-# shellcheck source=scripts/checks/domain/package/php.sh
-source "${PACKAGE_DIR}/php.sh"
 
 PATH_ROOT_ARG="${1:-.}"
 PATH_ROOT="$(cd "$PATH_ROOT_ARG" && pwd)"
@@ -51,12 +43,7 @@ if [[ "$FB_MODE" == "off" ]]; then
   exit "$(fb_exit_code "$STRICT_MODE" false)"
 fi
 
-SEC03_JAVASCRIPT_MODE="$(cfg_sec03_ecosystem_mode "javascript")"
 SEC03_PYTHON_MODE="$(cfg_sec03_ecosystem_mode "python")"
-SEC03_GO_MODE="$(cfg_sec03_ecosystem_mode "go")"
-SEC03_RUST_MODE="$(cfg_sec03_ecosystem_mode "rust")"
-SEC03_RUBY_MODE="$(cfg_sec03_ecosystem_mode "ruby")"
-SEC03_PHP_MODE="$(cfg_sec03_ecosystem_mode "php")"
 SEC03_UNSUPPORTED_MODE="$(cfg_sec03_unsupported_mode)"
 
 fp_init "$PATH_ROOT"
@@ -74,14 +61,17 @@ declare -a SEC03_DOCKERFILES=()
 declare -a SEC03_UNSUPPORTED=()
 
 sec03_inventory_name_union() {
+  local ecosystem
   pp_python_trigger_names
   pp_python_satisfier_names
   pp_javascript_trigger_names
   pp_javascript_satisfier_names
-  ecosystem_policy_detect_names "go"
-  ecosystem_policy_file_names "go"
+  while IFS= read -r ecosystem; do
+    [[ -z "$ecosystem" ]] && continue
+    ecosystem_policy_detect_names "$ecosystem"
+    ecosystem_policy_file_names "$ecosystem"
+  done < <(ecosystem_policy_ids)
   printf '%s\n' \
-    "Cargo.toml" "Cargo.lock" "Gemfile" "Gemfile.lock" "composer.json" "composer.lock" \
     "pom.xml" "build.gradle" "build.gradle.kts" "*.csproj" "*.fsproj" "packages.lock.json" \
     "deno.json" "Pipfile" "environment.yml" "Dockerfile" "Dockerfile.*"
 }
@@ -201,21 +191,6 @@ sec03__coverage_workflows_and_dockerfiles() {
   fb_add_coverage "Dockerfiles for digest-pinned bases: ${d_total} files (${d_skip} skipped, ${d_aud} evaluated)${ds:+; sample: }${ds}"
 }
 
-sec03_for_each_file() {
-  local callback="$1"
-  shift
-  local abs_path
-  for abs_path in "$@"; do
-    [[ -z "$abs_path" || ! -f "$abs_path" ]] && continue
-    local rel
-    rel="$(fp_rel_path "$abs_path")"
-    if fp_should_skip_validation "$rel"; then
-      continue
-    fi
-    "$callback" "$PATH_ROOT" "$abs_path" || true
-  done
-}
-
 sec03_phase_python_package_policy() {
   if [[ "$SEC03_PYTHON_MODE" == "off" ]]; then
     fb_add_coverage "Python skipped by config"
@@ -231,60 +206,52 @@ sec03_phase_python_package_policy() {
   fi
 }
 
+sec03_ecosystem_mode() {
+  cfg_sec03_ecosystem_mode "$1"
+}
+
+sec03_ecosystem_detect_names() {
+  if [[ "$1" == "javascript" ]]; then
+    pp_javascript_trigger_names
+  else
+    ecosystem_policy_detect_names "$1"
+  fi
+}
+
+sec03_ecosystem_label() {
+  case "$1" in
+    javascript) printf '%s' "JavaScript/TypeScript" ;;
+    go) printf '%s' "Go" ;;
+    rust) printf '%s' "Rust" ;;
+    ruby) printf '%s' "Ruby" ;;
+    php) printf '%s' "PHP" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 sec03_phase_manifests_and_requirements() {
+  local ecosystem label mode trigger_desc
   local -a files=()
-  local go_trigger_desc
-  go_trigger_desc="$(ecosystem_policy_detect_names "go" | paste -sd', ' -)"
-  if [[ "$SEC03_JAVASCRIPT_MODE" == "off" ]]; then
-    fb_add_coverage "JavaScript skipped by config"
-  elif sec03_inventory_has_names_from < <(pp_javascript_trigger_names); then
-    mapfile -t files < <(sec03_inventory_paths_for_names < <(pp_javascript_trigger_names))
-    cicd_sec_03_run_javascript_package_policy "$PATH_ROOT" "${files[@]+"${files[@]}"}" || true
-  else
-    fb_add_coverage "JavaScript/TypeScript package_policy: skipped; no configured trigger files found in inventory."
-  fi
-
-  if [[ "$SEC03_GO_MODE" == "off" ]]; then
-    fb_add_coverage "Go skipped by config"
-  elif sec03_inventory_has_names_from < <(ecosystem_policy_detect_names "go"); then
-    mapfile -t files < <(sec03_inventory_paths_for_names < <(ecosystem_policy_detect_names "go"))
-    cicd_sec_03_run_ecosystem_policy "$PATH_ROOT" "go" "${files[@]+"${files[@]}"}" || true
-  else
-    fb_add_coverage "Go ecosystems.yml policy: skipped; no configured detection files (${go_trigger_desc:-none configured}) found in inventory."
-  fi
-
-  if [[ "$SEC03_RUST_MODE" == "off" ]]; then
-    fb_add_coverage "Rust skipped by config"
-  elif sec03_inventory_has_any "Cargo.toml"; then
-    mapfile -t files < <(sec03_inventory_paths "Cargo.toml")
-    sec03_for_each_file cicd_sec_03_audit_rust_cargo_toml "${files[@]+"${files[@]}"}"
-    mapfile -t files < <(sec03_inventory_paths "Cargo.lock")
-    sec03_for_each_file cicd_sec_03_audit_rust_cargo_lock "${files[@]+"${files[@]}"}"
-  else
-    fb_add_coverage "Rust package audit: skipped; no Cargo.toml found in inventory."
-  fi
-
-  if [[ "$SEC03_RUBY_MODE" == "off" ]]; then
-    fb_add_coverage "Ruby skipped by config"
-  elif sec03_inventory_has_any "Gemfile"; then
-    mapfile -t files < <(sec03_inventory_paths "Gemfile")
-    sec03_for_each_file cicd_sec_03_audit_ruby_gemfile "${files[@]+"${files[@]}"}"
-    mapfile -t files < <(sec03_inventory_paths "Gemfile.lock")
-    sec03_for_each_file cicd_sec_03_audit_ruby_gemfile_lock "${files[@]+"${files[@]}"}"
-  else
-    fb_add_coverage "Ruby package audit: skipped; no Gemfile found in inventory."
-  fi
-
-  if [[ "$SEC03_PHP_MODE" == "off" ]]; then
-    fb_add_coverage "PHP skipped by config"
-  elif sec03_inventory_has_any "composer.json"; then
-    mapfile -t files < <(sec03_inventory_paths "composer.json")
-    sec03_for_each_file cicd_sec_03_audit_php_composer_json "${files[@]+"${files[@]}"}"
-    mapfile -t files < <(sec03_inventory_paths "composer.lock")
-    sec03_for_each_file cicd_sec_03_audit_php_composer_lock "${files[@]+"${files[@]}"}"
-  else
-    fb_add_coverage "PHP package audit: skipped; no composer.json found in inventory."
-  fi
+  while IFS= read -r ecosystem; do
+    [[ -z "$ecosystem" ]] && continue
+    label="$(sec03_ecosystem_label "$ecosystem")"
+    mode="$(sec03_ecosystem_mode "$ecosystem")"
+    if [[ "$mode" == "off" ]]; then
+      if [[ "$ecosystem" == "javascript" ]]; then
+        fb_add_coverage "JavaScript skipped by config"
+      else
+        fb_add_coverage "${label} skipped by config"
+      fi
+      continue
+    fi
+    if sec03_inventory_has_names_from < <(sec03_ecosystem_detect_names "$ecosystem"); then
+      mapfile -t files < <(sec03_inventory_paths_for_names < <(sec03_ecosystem_detect_names "$ecosystem"))
+      cicd_sec_03_run_ecosystem_policy "$PATH_ROOT" "$ecosystem" "${files[@]+"${files[@]}"}" || true
+    else
+      trigger_desc="$(sec03_ecosystem_detect_names "$ecosystem" | paste -sd', ' -)"
+      fb_add_coverage "${label} ecosystems.yml policy: skipped; no configured detection files (${trigger_desc:-none configured}) found in inventory."
+    fi
+  done < <(ecosystem_policy_ids)
 }
 
 sec03_phase_unsupported_ecosystems() {

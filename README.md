@@ -266,7 +266,7 @@ Optional kann das Ziel-Repo **zusätzliche** Einträge setzen:
 
 Merge-Verhalten: Ohne `yq` werden die mitgelieferten Default-Dateien unverändert verwendet. Mit `yq` werden die jeweiligen `package_policy.python`- und `package_policy.javascript`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
 
-**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Python-/JavaScript-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Go wird unabhängig vom Consumer-Overlay durch das Epic-Schema in [`scripts/config/ecosystems.yml`](scripts/config/ecosystems.yml) definiert. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre `global_excludes`- sowie Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
+**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Python-/JavaScript-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Go, Rust, Ruby und PHP sowie der JavaScript-Einstieg in die Validator-Registry werden durch [`scripts/config/ecosystems.yml`](scripts/config/ecosystems.yml) definiert. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre `global_excludes`- sowie Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
 
 SEC-03 baut mit einem repo-weiten Datei-Walk ein Basename-Inventar auf und startet einen Sprach-Checker nur, wenn mindestens ein konfigurierter Trigger vorhanden ist und das Ökosystem nicht per `.guardrails.yml` abgeschaltet wurde. Workflow-YAMLs werden separat und ausschließlich unter `.github/workflows` gesammelt. Das Scan-Coverage nennt ausgelassene Sprachen ausdrücklich. Erkannte `pom.xml`, `build.gradle`, `build.gradle.kts`, `*.csproj`, `*.fsproj`, `packages.lock.json`, `deno.json`, `Pipfile` und `environment.yml` erzeugen standardmäßig lediglich Notices; sie ändern den Exit-Code nicht.
 
@@ -408,20 +408,16 @@ cicd-guardrails/
 │
 ├── scripts/
 │   ├── config/
-│   │   ├── ecosystems.yml                # Go Epic-Schema (Detection, Dateien, Regeln, Meldungen)
+│   │   ├── ecosystems.yml                # SEC-03 Ecosystem-Schema (Detection, Regeln, Validatoren)
 │   │   ├── package_policy.defaults.yml   # Python CICD-SEC-03 Standardpolicy
 │   │   └── package_policy.javascript.defaults.yml # JS/TS/Bun Standardpolicy
 │   ├── checks/
 │   │   ├── domain/                       # Fachliche Startpunkte (cicd_sec_*)
 │   │   │   ├── cicd_sec_01_flow.sh
 │   │   │   ├── cicd_sec_03_dependency_chain.sh
-│   │   │   ├── package/                  # Sprachmodule fuer CICD-SEC-03-DEPENDENCY-CHAIN (JS/Go/Rust/Ruby/PHP; Python Logik)
-│   │   │   │   ├── js_ts.sh
-│   │   │   │   ├── python.sh
-│   │   │   │   ├── policy_runner.sh      # Schema-getriebener Ecosystem-Runner (Go)
-│   │   │   │   ├── rust.sh
-│   │   │   │   ├── ruby.sh
-│   │   │   │   └── php.sh
+│   │   │   ├── package/                  # Gemeinsame SEC-03 YAML-Engine
+│   │   │   │   ├── policy_runner.sh      # YAML-Primitives und Named-Validator-Dispatch
+│   │   │   │   └── validators.sh         # JS- und Python-Validatoren/Policy-Runner
 │   │   │   ├── cicd_sec_04_poisoned_pipeline.sh
 │   │   │   ├── cicd_sec_05_branch.sh
 │   │   │   ├── cicd_sec_05_permissions.sh
@@ -472,20 +468,13 @@ In CI prüft [`.github/workflows/self-test.yml`](.github/workflows/self-test.yml
 
 ### Modular package check architecture (`CICD-SEC-03-DEPENDENCY-CHAIN`)
 
-`CICD-SEC-03-DEPENDENCY-CHAIN` behält seine öffentliche Designation und Workflow-Anbindung, nutzt intern aber ein Dispatcher-Muster. Das Top-Level-Skript orchestriert Sprachmodule mit stabiler Schnittstelle:
+`CICD-SEC-03-DEPENDENCY-CHAIN` behält seine öffentliche Designation und Workflow-Anbindung, nutzt intern aber eine YAML-Engine mit stabiler Schnittstelle:
 
 - input: repository root path
 - output: findings via shared reporting library
 - exit semantics: `0` (pass/warn), `1` (fail), `2` (missing runtime dependency)
 
-Aktuelle Sprachmodule:
-
-- `scripts/checks/domain/package/js_ts.sh`
-- `scripts/checks/domain/package/python.sh`
-- `scripts/checks/domain/package/policy_runner.sh` (liest Detection, Regeln, Meldungen und Remediation aus `scripts/config/ecosystems.yml`)
-- `scripts/checks/domain/package/rust.sh`
-- `scripts/checks/domain/package/ruby.sh`
-- `scripts/checks/domain/package/php.sh`
+Die Engine besteht aus `scripts/checks/domain/package/policy_runner.sh` (Detection, Primitives und fail-closed Validator-Dispatch) und `validators.sh` (benannte JS-/Python-Validatoren). `ecosystems.yml` deklariert Go, Rust, Ruby, PHP und JavaScript. Python bleibt wegen seines Overlay-Modells in `package_policy.defaults.yml`, wird aber von derselben Validator-Registry ausgeführt. Unbekannte `validator:`-Namen erzeugen ein Error-Finding, damit eine Fehlkonfiguration keine Prüfung stillschweigend deaktiviert.
 
 Das unterstützt Repositories mit einem Service im Root und Monorepos mit vielen verschachtelten Services.
 
@@ -499,7 +488,7 @@ Für JavaScript/TypeScript gilt pro Projektverzeichnis:
 - npm-v2/v3-Integrität, Yarn-v1-Integrity bzw. Yarn-Berry-Checksums und pnpm-Integrity werden geprüft
 - `bun.lockb` bleibt Teil der JavaScript-Policy und muss nicht leer sein
 
-Go nutzt das Epic-Schema unter `scripts/config/ecosystems.yml`: `detect.any_files` aktiviert den Audit nur bei `go.mod`; die Regeln `require_sibling` und `not_empty` prüfen eine gleichverzeichnisige, nicht leere `go.sum`. `message` und `remediation` kommen direkt aus YAML. Ohne `go.mod` wird kein Go-Audit ausgeführt.
+Go, Rust, Ruby und PHP nutzen das Schema unter `scripts/config/ecosystems.yml`: `detect.any_files` aktiviert den Audit, `require_sibling` und `not_empty` bilden die Lockfile-Regeln ab. Rust und PHP behalten ihre bisherigen kleinen `contains`-Prüfungen samt Mindestgröße. JavaScript referenziert dort den benannten `javascript_package_policy`-Validator; dessen Trigger-, Satisfier- und Integritätszuordnung stammt weiterhin aus den mergebaren JavaScript-Defaults. Meldungen und Remediation für YAML-Primitives kommen direkt aus YAML. Fehlt ein Detection-Trigger, wird das Ökosystem nicht auditiert.
 
 ---
 

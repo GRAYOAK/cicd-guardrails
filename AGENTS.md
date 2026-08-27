@@ -83,7 +83,9 @@ bash scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh <repo-root>
 | `feedback.sh` | Reporting, modes, summary blocks |
 | `config.sh` | Reads `.guardrails.yml` (context + per-check `mode`) |
 | `file_patterns.sh` | `find` helpers, exclude overlays |
-| `package_policy.sh` | Python policy merge |
+| `package_policy.sh` | Python/JavaScript policy merge |
+| `checks/domain/package/policy_runner.sh` | SEC-03 YAML primitives and named-validator dispatch |
+| `checks/domain/package/validators.sh` | SEC-03 JavaScript/Python named validator implementations |
 | `action_pin_audit.sh` / `dockerfile_pin_audit.sh` | Pinning audits |
 
 ### Tests

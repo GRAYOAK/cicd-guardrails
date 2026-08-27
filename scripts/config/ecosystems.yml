@@ -15,3 +15,60 @@ ecosystems:
           - not_empty: true
             message: "go.sum is empty."
             remediation: "Run go mod tidy and commit go.sum."
+  rust:
+    detect:
+      any_files: [Cargo.toml]
+    files:
+      - name: Cargo.toml
+        rules:
+          - require_sibling: [Cargo.lock]
+            message: "Missing Cargo.lock next to Cargo.toml."
+            remediation: "Generate and commit Cargo.lock."
+      - name: Cargo.lock
+        rules:
+          - not_empty: true
+            message: "Cargo.lock is empty."
+            remediation: "Run cargo generate-lockfile and commit Cargo.lock."
+          - contains: "^version = "
+            minimum_bytes: 80
+            message: "Cargo.lock appears invalid."
+            remediation: "Run cargo generate-lockfile and commit Cargo.lock."
+  ruby:
+    detect:
+      any_files: [Gemfile]
+    files:
+      - name: Gemfile
+        rules:
+          - require_sibling: [Gemfile.lock]
+            message: "Missing Gemfile.lock next to Gemfile."
+            remediation: "Generate and commit Gemfile.lock."
+      - name: Gemfile.lock
+        rules:
+          - not_empty: true
+            message: "Gemfile.lock is empty."
+            remediation: "Run bundle install and commit Gemfile.lock."
+  php:
+    detect:
+      any_files: [composer.json]
+    files:
+      - name: composer.json
+        rules:
+          - require_sibling: [composer.lock]
+            message: "Missing composer.lock next to composer.json."
+            remediation: "Run composer install and commit composer.lock."
+      - name: composer.lock
+        rules:
+          - not_empty: true
+            message: "composer.lock is empty."
+            remediation: "Run composer install and commit composer.lock."
+          - contains: "\"packages\""
+            minimum_bytes: 120
+            message: "composer.lock missing packages section (invalid lockfile)."
+            remediation: "Run composer install and commit composer.lock."
+  javascript:
+    detect:
+      any_files: [package.json, tsconfig.json, jsconfig.json]
+    files:
+      - name: package.json
+        rules:
+          - validator: javascript_package_policy
