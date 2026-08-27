@@ -223,6 +223,24 @@ assert_output_contains "SEC-03 phase lockfiles" "phase: lockfiles"
 assert_output_contains "SEC-03 phase workflows" "phase: workflows"
 assert_output_contains "SEC-03 phase docker" "phase: docker"
 assert_output_contains "SEC-03 phase summary" "phase: summary"
+assert_output_contains "SEC-03 skips Go checker without go.mod inventory trigger" "Go package_policy: skipped; no configured trigger files (go.mod) found in inventory."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh reports unsupported Maven without failing"
+setup
+cat >"$TMP/pom.xml" <<'EOF'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>example</groupId>
+  <artifactId>demo</artifactId>
+  <version>1.0.0</version>
+</project>
+EOF
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "passes when only an unsupported pom.xml is present" 0 "$LAST_EXIT"
+assert_output_contains "reports Maven as an unsupported dependency signal" "Unsupported Maven dependency signal 'pom.xml' detected"
+assert_output_contains "records the unsupported signal as a notice" "[notice] pom.xml"
 teardown
 
 echo ""
@@ -237,6 +255,15 @@ echo '{"name":"js-green","private":true}' >"$TMP/js-green/package.json"
 write_empty_yarn_lock "$TMP/js-green/yarn.lock"
 run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "passes exact tsconfig/jsconfig projects with package.json and one lockfile" 0 "$LAST_EXIT"
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh keeps Bun in JavaScript policy"
+setup
+echo '{"name":"bun-app","private":true}' >"$TMP/package.json"
+printf 'BUNLOCK' >"$TMP/bun.lockb"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "passes package.json with a nonempty bun.lockb" 0 "$LAST_EXIT"
 teardown
 
 echo ""
@@ -594,6 +621,24 @@ EOF
 run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when go.mod has no go.sum" 1 "$LAST_EXIT"
 assert_output_contains "reports missing go lockfile" "Missing go.sum next to go.mod."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh validates Go YAML policy satisfier"
+setup
+mkdir -p "$TMP/services/go-api"
+cat >"$TMP/services/go-api/go.mod" <<'EOF'
+module example.com/go-api
+
+go 1.22
+EOF
+printf 'example.com/dependency v1.0.0 h1:AAAA\n' >"$TMP/services/go-api/go.sum"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "passes when go.mod has a nonempty same-directory go.sum" 0 "$LAST_EXIT"
+printf '' >"$TMP/services/go-api/go.sum"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "fails when go.sum is empty" 1 "$LAST_EXIT"
+assert_output_contains "preserves empty go.sum finding" "go.sum is empty."
 teardown
 
 echo ""
@@ -980,6 +1025,15 @@ for item in json.load(sys.stdin):
   else
     echo "  ❌ reference package_policy.javascript drifts from shipped defaults"
     diff -u <(yq eval -oj '.' "$JS_DEFAULTS_YML") <(yq eval -oj '.package_policy.javascript' "$REF_YML") || true
+    FAIL=$((FAIL + 1))
+  fi
+  GO_DEFAULTS_YML="${ROOT_DIR}/scripts/config/package_policy.go.defaults.yml"
+  if diff -q <(yq eval -oj '.' "$GO_DEFAULTS_YML") <(yq eval -oj '.package_policy.go' "$REF_YML") >/dev/null 2>&1; then
+    echo "  ✅ reference package_policy.go matches shipped defaults"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ reference package_policy.go drifts from shipped defaults"
+    diff -u <(yq eval -oj '.' "$GO_DEFAULTS_YML") <(yq eval -oj '.package_policy.go' "$REF_YML") || true
     FAIL=$((FAIL + 1))
   fi
 fi

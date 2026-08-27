@@ -215,6 +215,12 @@ sec03__run_js_hash_validator() {
     npm_lock_integrity) sec03__validate_npm_lock_integrity "$path_root" "$lockfile" ;;
     yarn_lock_integrity) sec03__validate_yarn_lock_integrity "$path_root" "$lockfile" ;;
     pnpm_lock_integrity) sec03__validate_pnpm_lock_integrity "$path_root" "$lockfile" ;;
+    nonempty_file)
+      if [[ ! -s "$lockfile" ]]; then
+        fb_report "error" "$(basename "$lockfile") is empty." "$(pkg_rel_path "$path_root" "$lockfile")" "" \
+          "Regenerate the lockfile with the selected package manager and commit it." "js_ts"
+      fi
+      ;;
     *)
       fb_report "warning" "Unknown JavaScript lock validator '${validator}'." "$(pkg_rel_path "$path_root" "$lockfile")" "" \
         "Fix package_policy.javascript.hash_validators in the defaults or overlay." "js_ts"
@@ -227,12 +233,13 @@ sec03__javascript_trigger_combo_allowed() {
   local dir="$2"
   shift 2
   local -a triggers=("$@")
-  local trigger_key combo
+  local trigger_key combo allowed=false
   trigger_key="$(printf '%s\n' "${triggers[@]}" | sort -u | paste -sd' ' -)"
   while IFS= read -r combo; do
     [[ -z "$combo" ]] && continue
-    [[ "$trigger_key" == "$combo" ]] && return 0
+    [[ "$trigger_key" == "$combo" ]] && allowed=true
   done < <(pp_javascript_allowed_combo_sorted_space_lines)
+  $allowed && return 0
 
   local rel_probe
   rel_probe="$(pkg_rel_path "$path_root" "${dir}/${triggers[0]}")"
@@ -243,20 +250,31 @@ sec03__javascript_trigger_combo_allowed() {
 
 cicd_sec_03_run_javascript_package_policy() {
   local path_root="$1"
+  shift
+  local -a inventory_triggers=("$@")
   local -a project_dirs=()
   while IFS= read -r dir; do
     [[ -n "$dir" ]] && project_dirs+=("$dir")
   done < <(
     local trigger artifact rel
-    while IFS= read -r trigger; do
-      [[ -z "$trigger" ]] && continue
-      while IFS= read -r artifact; do
+    if ((${#inventory_triggers[@]} > 0)); then
+      for artifact in "${inventory_triggers[@]}"; do
         [[ -z "$artifact" || ! -f "$artifact" ]] && continue
         rel="$(pkg_rel_path "$path_root" "$artifact")"
         fp_should_skip_validation "$rel" && continue
         dirname "$artifact"
-      done < <(fp_find_with_names "$path_root" "$trigger")
-    done < <(pp_javascript_trigger_names) | sort -u
+      done
+    else
+      while IFS= read -r trigger; do
+        [[ -z "$trigger" ]] && continue
+        while IFS= read -r artifact; do
+          [[ -z "$artifact" || ! -f "$artifact" ]] && continue
+          rel="$(pkg_rel_path "$path_root" "$artifact")"
+          fp_should_skip_validation "$rel" && continue
+          dirname "$artifact"
+        done < <(fp_find_with_names "$path_root" "$trigger")
+      done < <(pp_javascript_trigger_names)
+    fi | sort -u
   )
 
   local dir
@@ -301,7 +319,7 @@ cicd_sec_03_audit_js_ts_package_json() {
 
   if ((${#present[@]} == 0)); then
     fb_report "error" "JavaScript project is missing a lockfile in the package.json directory." "$rel" "" \
-      "Generate and commit exactly one of package-lock.json, yarn.lock, or pnpm-lock.yaml beside package.json." "js_ts"
+      "Generate and commit exactly one of package-lock.json, yarn.lock, pnpm-lock.yaml, or bun.lockb beside package.json." "js_ts"
     return 0
   fi
   if ((${#present[@]} > 1)); then

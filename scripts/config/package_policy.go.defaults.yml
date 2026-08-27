@@ -1,0 +1,9 @@
+# Shipped CICD-SEC-03 Go package policy.
+# Merged with .guardrails.file-patterns.yml key package_policy.go.
+
+triggers:
+  - go.mod
+satisfiers:
+  - go.sum
+hash_validators:
+  go.sum: nonempty_file

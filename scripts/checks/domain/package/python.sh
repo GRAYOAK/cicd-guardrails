@@ -251,6 +251,8 @@ sec03__run_hash_validator() {
 
 cicd_sec_03_run_python_package_policy() {
   local path_root="$1"
+  shift
+  local -a inventory_triggers=("$@")
   local mf
   mf="$(pp_python_merged_file)"
   if [[ -z "$mf" || ! -f "$mf" ]]; then
@@ -267,17 +269,24 @@ cicd_sec_03_run_python_package_policy() {
     [[ -n "$d" ]] && uniq_dirs+=("$d")
   done < <(
     local t abs rel
-    while IFS= read -r t; do
-      [[ -z "$t" ]] && continue
-      while IFS= read -r abs; do
+    if ((${#inventory_triggers[@]} > 0)); then
+      for abs in "${inventory_triggers[@]}"; do
         [[ -z "$abs" || ! -f "$abs" ]] && continue
         rel="$(pkg_rel_path "$path_root" "$abs")"
-        if fp_should_skip_validation "$rel"; then
-          continue
-        fi
+        fp_should_skip_validation "$rel" && continue
         dirname "$abs"
-      done < <(fp_find_with_names "$path_root" "$t")
-    done < <(pp_python_trigger_names) | sort -u
+      done
+    else
+      while IFS= read -r t; do
+        [[ -z "$t" ]] && continue
+        while IFS= read -r abs; do
+          [[ -z "$abs" || ! -f "$abs" ]] && continue
+          rel="$(pkg_rel_path "$path_root" "$abs")"
+          fp_should_skip_validation "$rel" && continue
+          dirname "$abs"
+        done < <(fp_find_with_names "$path_root" "$t")
+      done < <(pp_python_trigger_names)
+    fi | sort -u
   )
 
   local dir

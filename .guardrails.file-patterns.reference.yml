@@ -12,9 +12,10 @@
 # js_ts / package-lock.json        same — cicd_sec_03_audit_js_ts_lock_package_lock
 # js_ts / yarn.lock                same — cicd_sec_03_audit_js_ts_lock_yarn
 # js_ts / pnpm-lock.yaml           same — cicd_sec_03_audit_js_ts_lock_pnpm
+# js_ts / bun.lockb                same — nonempty_file validator
 # python / (directory policy)      scripts/config/package_policy.defaults.yml + scripts/lib/package_policy.sh + scripts/checks/domain/package/python.sh — cicd_sec_03_run_python_package_policy
-# go / go.mod                      scripts/checks/domain/package/go.sh — cicd_sec_03_audit_go_mod
-# go / go.sum                      same — cicd_sec_03_audit_go_sum
+# go / go.mod                      package_policy.go + generic same-directory policy runner
+# go / go.sum                      same — nonempty_file validator
 # rust / Cargo.toml                scripts/checks/domain/package/rust.sh — cicd_sec_03_audit_rust_cargo_toml
 # rust / Cargo.lock                same — cicd_sec_03_audit_rust_cargo_lock
 # ruby / Gemfile                   scripts/checks/domain/package/ruby.sh — cicd_sec_03_audit_ruby_gemfile
@@ -81,6 +82,7 @@ package_policy:
       - package-lock.json
       - yarn.lock
       - pnpm-lock.yaml
+      - bun.lockb
     allowed_trigger_combinations:
       - - package.json
       - - tsconfig.json
@@ -91,10 +93,20 @@ package_policy:
       - - package-lock.json
       - - yarn.lock
       - - pnpm-lock.yaml
+      - - bun.lockb
     manifest_validator: package_json_exact_specs
     hash_validators:
       package-lock.json: npm_lock_integrity
       yarn.lock: yarn_lock_integrity
       pnpm-lock.yaml: pnpm_lock_integrity
+      bun.lockb: nonempty_file
+  # Mirror of scripts/config/package_policy.go.defaults.yml.
+  go:
+    triggers:
+      - go.mod
+    satisfiers:
+      - go.sum
+    hash_validators:
+      go.sum: nonempty_file
 
 # Minimal overlay examples for consumer repos: see README (Dateiscan-Overlay).

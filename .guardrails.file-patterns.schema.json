@@ -58,7 +58,7 @@
         },
         "javascript": {
           "type": "object",
-          "description": "Partial merge over scripts/config/package_policy.javascript.defaults.yml. Exact package.json, tsconfig.json, and jsconfig.json basenames identify projects by default.",
+          "description": "Partial merge over scripts/config/package_policy.javascript.defaults.yml. Exact package.json, tsconfig.json, and jsconfig.json basenames identify projects by default; npm, Yarn, pnpm, and Bun lockfiles are supported.",
           "additionalProperties": false,
           "properties": {
             "triggers": {
@@ -95,6 +95,29 @@
               "type": "object",
               "description": "Maps lockfile basename to npm_lock_integrity, yarn_lock_integrity, or pnpm_lock_integrity.",
               "additionalProperties": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "go": {
+          "type": "object",
+          "description": "Partial merge over scripts/config/package_policy.go.defaults.yml. go.mod triggers require a same-directory go.sum by default.",
+          "additionalProperties": false,
+          "properties": {
+            "triggers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Basenames that identify Go project directories."
+            },
+            "satisfiers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1,
+              "description": "Basenames; at least one must exist beside each trigger."
+            },
+            "hash_validators": {
+              "type": "object",
+              "description": "Maps satisfier basename to a built-in validator id (nonempty_file).",
+              "additionalProperties": { "type": "string", "enum": ["nonempty_file"] }
             }
           }
         }
