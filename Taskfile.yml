@@ -1,0 +1,12 @@
+version: "3"
+
+tasks:
+  test:
+    desc: Run unit/function tests for domain checks
+    cmds:
+      - bash tests/test_checks.sh
+
+  test:demos:
+    desc: Run file-based checks against sibling demo-well and demo-errors trees
+    cmds:
+      - bash tests/test_demo_repos.sh

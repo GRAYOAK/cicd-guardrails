@@ -23,7 +23,7 @@ Die **Implementierung** (Skripte, Workflow-Definitionen, Hook-Metadaten) liegt a
 > # Output: abc123...def456  HEAD
 > ```
 >
-> Nach einem Release: [`migrations/README.md`](migrations/README.md) und Release-Assets lesen. Referenz-Ziel-Repos: [`cicd-demo-well`](https://github.com/Christopher-Rust/cicd-demo-well) (compliant) und [`cicd-demo-errors`](https://github.com/Christopher-Rust/cicd-demo-errors) (negative Fixtures) — dort `security.yml` und `.pre-commit-config.yaml` ohne festen SHA in dieser Doku; immer Platzhalter `<SHA>` durch euren Pin ersetzen.
+> Nach einem Release: [`migrations/README.md`](migrations/README.md) und Release-Assets lesen. Referenz-Ziel-Repos: [`cicd-guardrails-demo-well`](https://github.com/GRAYOAK/cicd-guardrails-demo-well) (compliant) und [`cicd-guardrails-demo-errors`](https://github.com/GRAYOAK/cicd-guardrails-demo-errors) (negative Fixtures) — dort `security.yml` und `.pre-commit-config.yaml` ohne festen SHA in dieser Doku; immer Platzhalter `<SHA>` durch euren Pin ersetzen.
 >
 > **Geprüft wird euer Ziel-Repository; geliefert wird die gepinnte Version von hier.**
 
@@ -71,7 +71,7 @@ repos:
 
 Die Hooks analysieren Dateien im Ziel-Repo (pre-commit setzt das Arbeitsverzeichnis auf `.`). API-Kontext-Checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) sind bewusst **nicht** als Standard-Hooks vorgesehen — dafür CI mit optionalem Admin-Token.
 
-Vollständiges Beispiel: [cicd-demo-well `.pre-commit-config.yaml`](https://github.com/Christopher-Rust/cicd-demo-well/blob/main/.pre-commit-config.yaml).
+Vollständiges Beispiel: [cicd-guardrails-demo-well `.pre-commit-config.yaml`](https://github.com/GRAYOAK/cicd-guardrails-demo-well/blob/main/.pre-commit-config.yaml).
 
 ### CI-Check (GitHub Actions)
 
@@ -98,7 +98,7 @@ jobs:
 
 Ohne Admin-Token laufen alle dateibasierten Checks; API-Checks (`cicd-sec-01-flow`, `cicd-sec-05-branch`) können eingeschränkt oder übersprungen sein.
 
-Referenz im Ziel-Repo: [cicd-demo-well `security.yml`](https://github.com/Christopher-Rust/cicd-demo-well/blob/main/.github/workflows/security.yml).
+Referenz im Ziel-Repo: [cicd-guardrails-demo-well `security.yml`](https://github.com/GRAYOAK/cicd-guardrails-demo-well/blob/main/.github/workflows/security.yml).
 
 Vollständiges Setup (GitHub App, Branch Protection, `skip-checks`, `.guardrails.yml`): Abschnitt [Einbindung in andere Repos](#einbindung-in-andere-repos).
 
@@ -303,14 +303,14 @@ Der Job `notify-demo-repos` nutzt eine **separate** App (`GUARDRAILS_CONSUMER_DI
 
 #### Demo-Repos: automatischer Pin-Bump nach Release
 
-Die Fixture-Repositories [`cicd-demo-errors`](https://github.com/Christopher-Rust/cicd-demo-errors) und [`cicd-demo-well`](https://github.com/Christopher-Rust/cicd-demo-well) können nach jedem erfolgreichen Release automatisch ein `repository_dispatch`-Ereignis erhalten und daraufhin einen PR öffnen, der `security.yml` und `.pre-commit-config.yaml` auf den **Release-Tag-Commit-SHA** hebt.
+Die Fixture-Repositories [`cicd-guardrails-demo-errors`](https://github.com/GRAYOAK/cicd-guardrails-demo-errors) und [`cicd-guardrails-demo-well`](https://github.com/GRAYOAK/cicd-guardrails-demo-well) können nach jedem erfolgreichen Release automatisch ein `repository_dispatch`-Ereignis erhalten und daraufhin einen PR öffnen, der `security.yml` und `.pre-commit-config.yaml` auf den **Release-Tag-Commit-SHA** hebt.
 
 Voraussetzungen:
 
 1. In beiden Demo-Repos existiert der Workflow [`.github/workflows/guardrails-release-bump.yml`](.github/workflows/guardrails-release-bump.yml) (löst nur auf `guardrails-release` aus).
 2. Eine **GitHub App** (neu oder bestehend) mit Zugriff auf beide Demo-Repos:
    - Unter *GitHub App settings* → **Permissions & events** → **Repository permissions** → **Contents**: *Read and write* (für `repository_dispatch` auf dem Ziel-Repo).
-   - App auf **cicd-demo-errors** und **cicd-demo-well** installieren (*Install App* → nur diese beiden Repos auswählen). Die App muss nicht auf **cicd-guardrails** installiert sein; der Release-Workflow nutzt nur App-ID und Private Key, um ein Installation-Token für die Demo-Installation zu minten.
+   - App auf **cicd-guardrails-demo-errors** und **cicd-guardrails-demo-well** installieren (*Install App* → nur diese beiden Repos auswählen). Die App muss nicht auf **cicd-guardrails** installiert sein; der Release-Workflow nutzt nur App-ID und Private Key, um ein Installation-Token für die Demo-Installation zu minten.
 3. Im **cicd-guardrails**-Repository unter *Settings* → *Secrets and variables* → *Actions* zwei Secrets anlegen:
    - **`GUARDRAILS_CONSUMER_DISPATCH_APP_ID`** — numerische App-ID (Profilseite der App).
    - **`GUARDRAILS_CONSUMER_DISPATCH_APP_PRIVATE_KEY`** — vollständiger PEM-Inhalt des generierten Private Keys (einschließlich `BEGIN`/`END`-Zeilen).
@@ -442,7 +442,8 @@ cicd-guardrails/
     │   ├── bad-prt.yml            # Schlechtes Beispiel – soll fehlschlagen
     │   ├── bad-pinning.yml        # Schlechtes Beispiel – soll fehlschlagen
     │   └── good-workflow.yml      # Gutes Beispiel – soll bestehen
-    └── test_checks.sh             # Bash-Tests
+    ├── test_checks.sh             # Bash-Tests (task test)
+    └── test_demo_repos.sh         # Demo well/errors Outcome-Harness (task test:demos, lokal)
 ```
 
 ---
@@ -452,8 +453,11 @@ cicd-guardrails/
 ### Regressionstests
 
 ```bash
-bash tests/test_checks.sh
+task test          # bash tests/test_checks.sh
+task test:demos    # bash tests/test_demo_repos.sh
 ```
+
+`task test:demos` prüft die GRAYOAK-Fixtures [`cicd-guardrails-demo-well`](https://github.com/GRAYOAK/cicd-guardrails-demo-well) und [`cicd-guardrails-demo-errors`](https://github.com/GRAYOAK/cicd-guardrails-demo-errors). Standardpfade sind Geschwisterverzeichnisse neben diesem Clone; Override: `GUARDRAILS_DEMO_WELL_PATH` / `GUARDRAILS_DEMO_ERRORS_PATH`. Der Harness überspringt API-Checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`). well muss überall Exit 0 liefern; errors muss insgesamt ungleich 0 sein (SEC-03 reicht). Exit 2 ist Infrastruktur, kein erwartetes errors-Rot. Dieser Task ist **nicht** als Required-Check auf jedem Producer-PR verdrahtet.
 
 ### Checks gegen dieses Repo (Dogfooding)
 

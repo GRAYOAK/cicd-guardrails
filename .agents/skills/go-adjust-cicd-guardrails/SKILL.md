@@ -30,6 +30,7 @@ Use this skill for changes in:
 - `migrations/README.md`, `migrations/TEMPLATE.md`, `migrations/.unreleased/*.md` (consumer migration snippets)
 - `CHANGELOG.md` (only when repository policy allows manual edits; otherwise rely on Conventional Commits and release-please)
 - `tests/test_checks.sh`
+- `tests/test_demo_repos.sh` and `Taskfile.yml` (when demo wiring or local harness changes)
 - `README.md`
 - `.agents/skills/go-adjust-cicd-guardrails/reference-feedback-json.md` (JSON and scan-coverage contract for implementers)
 
@@ -122,7 +123,7 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
 - **Breaking changes** (`feat!:`, `fix!:`, or `BREAKING CHANGE:` footer): add at least one new snippet under `migrations/.unreleased/<short-slug>.md` copied from `migrations/TEMPLATE.md` so **migration-guard** passes and `release.yml` can assemble `migrations/vX.Y.Z.md` on cut.
 - **Non-breaking but consumer-visible** scan surface, job expectations, or hook `files` filters: still add an `.unreleased` snippet when operators or pinned callers must act; otherwise update `README.md` and demo repos clearly.
 - **Skill-only edits** (files under `.agents/skills/go-adjust-cicd-guardrails/` with no change to shipped scripts, workflows, or hooks): use a commit prefix such as `docs(skill):` or `chore(skill):` and skip new `migrations/.unreleased` snippets unless product consumers are genuinely impacted; keep release-please noise aligned with the real product surface.
-- **Demo repositories** (`cicd-demo-errors`, `cicd-demo-well`): keep them aligned with reusable-workflow behavior and local hook patterns whenever checks change what they exercise.
+- **Demo repositories** (`GRAYOAK/cicd-guardrails-demo-errors`, `GRAYOAK/cicd-guardrails-demo-well`): keep them aligned with reusable-workflow behavior and local hook patterns whenever checks change what they exercise. Default local trees are siblings of this clone (`../cicd-guardrails-demo-well`, `../cicd-guardrails-demo-errors`); override with `GUARDRAILS_DEMO_WELL_PATH` / `GUARDRAILS_DEMO_ERRORS_PATH`.
 - After a version exists, consumers should read `migrations/vX.Y.Z.md` from the GitHub Release assets together with `CHANGELOG.md`.
 
 ## Reference files
@@ -155,28 +156,30 @@ Load-on-demand triggers:
 
 ## Test repositories
 
-Use two complementary demo repositories to validate changes end-to-end:
+Canonical names (GRAYOAK). Legacy `cicd-demo-*` / Christopher-Rust demo URLs are obsolete.
 
-- `cicd-demo-errors` (`/Users/rust/Projects/try/CICD Security/cicd-demo-errors`)
+Local defaults: sibling directories of this repository. Override with `GUARDRAILS_DEMO_WELL_PATH` and `GUARDRAILS_DEMO_ERRORS_PATH`.
+
+- `GRAYOAK/cicd-guardrails-demo-errors` (`../cicd-guardrails-demo-errors`)
   - Purpose: negative fixture with intentional violations.
-  - Expected outcome: relevant checks report findings and fail in strict mode.
+  - Expected outcome: relevant file-based checks report findings and fail in strict mode (`task test:demos`: overall != 0; SEC-03 failing is sufficient).
   - Use it to validate detection quality, annotation clarity, and remediation text.
 
-- `cicd-demo-well` (`/Users/rust/Projects/try/CICD Security/cicd-demo-well`)
+- `GRAYOAK/cicd-guardrails-demo-well` (`../cicd-guardrails-demo-well`)
   - Purpose: positive fixture with compliant workflows and multi-language lockfile coverage.
-  - Expected outcome: file-based checks pass; API-context checks require repository policy context and valid token permissions.
-  - Use it to catch false positives and verify stable pass behavior across JS/TS, Python, Go, Rust, Ruby, and PHP package patterns.
+  - Expected outcome: file-based checks pass; API-context checks (`CICD-SEC-01-FLOW`, `CICD-SEC-05-BRANCH`) require repository policy context and valid token permissions and are skipped by `task test:demos`.
+  - Use it to catch false positives and verify stable pass behavior across JS/TS, Python, Go, Rust, Ruby, PHP, and Dart package patterns.
 
-When behavior changes are user-facing, update both repositories and keep their workflow pins aligned with the reusable workflow revision.
+When behavior changes are user-facing, update both repositories and keep their workflow pins aligned with the reusable workflow revision. Run `task test` and `task test:demos` locally; do not make `test:demos` a required CI job on every producer PR.
 
 ## Definition of done
 
-- Tests pass: `bash ./tests/test_checks.sh`
+- Tests pass: `task test` (`bash ./tests/test_checks.sh`); when check/workflow/hook or demo fixtures change, also `task test:demos`
 - No new diagnostics in edited files.
 - Workflow wiring still consistent for artifacts and final summary job.
 - README reflects behavior for users of reusable workflow (including migration and changelog policy when relevant).
 - Schema, example docs, and consumer config examples are consistent.
 - **Changelog policy**: no forbidden manual edits to `CHANGELOG.md`; commits follow Conventional Commits so release-please can update the changelog.
 - **Migrations**: breaking PRs include new `migrations/.unreleased/*.md`; consumer-visible changes either add snippets or clearly update README and demo repos.
-- **Demo repositories** (`cicd-demo-errors`, `cicd-demo-well`) updated when check behaviour or fixtures change.
+- **Demo repositories** (`GRAYOAK/cicd-guardrails-demo-errors`, `GRAYOAK/cicd-guardrails-demo-well`) updated when check behaviour or fixtures change.
 - External release notes (for example in a team wiki) updated only when the change set explicitly requires communicating outside this repository.

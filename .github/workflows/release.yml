@@ -201,8 +201,8 @@ jobs:
           private-key: ${{ secrets.GUARDRAILS_CONSUMER_DISPATCH_APP_PRIVATE_KEY }}
           owner: ${{ env.REPO_OWNER }}
           repositories: |
-            ${{ env.REPO_OWNER }}/cicd-demo-errors
-            ${{ env.REPO_OWNER }}/cicd-demo-well
+            ${{ env.REPO_OWNER }}/cicd-guardrails-demo-errors
+            ${{ env.REPO_OWNER }}/cicd-guardrails-demo-well
           permission-contents: write
 
       - name: Skip demo dispatch when app credentials are not configured
@@ -210,7 +210,7 @@ jobs:
         run: |
           echo "Skipping demo-repo dispatch (mint GitHub App token step did not succeed)."
           echo "Add secrets GUARDRAILS_CONSUMER_DISPATCH_APP_ID and GUARDRAILS_CONSUMER_DISPATCH_APP_PRIVATE_KEY"
-          echo "and install that app on cicd-demo-errors and cicd-demo-well with Contents: Read and write."
+          echo "and install that app on cicd-guardrails-demo-errors and cicd-guardrails-demo-well with Contents: Read and write."
 
       - name: Resolve tag commit and notify consumer repositories
         if: ${{ steps.dispatch-app-token.outcome == 'success' }}
@@ -226,7 +226,7 @@ jobs:
           BODY="$(jq -nc --arg sha "$SHA" --arg tag "$TAG_NAME" \
             '{event_type:"guardrails-release", client_payload:{sha:$sha, tag:$tag}}')"
           any_ok=0
-          for repo in "${REPO_OWNER}/cicd-demo-errors" "${REPO_OWNER}/cicd-demo-well"; do
+          for repo in "${REPO_OWNER}/cicd-guardrails-demo-errors" "${REPO_OWNER}/cicd-guardrails-demo-well"; do
             if gh api --method POST "repos/${repo}/dispatches" --input - <<<"$BODY"; then
               echo "Dispatched guardrails-release to ${repo} (tag ${TAG_NAME}, sha ${SHA})."
               any_ok=1
