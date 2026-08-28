@@ -98,6 +98,7 @@
           "properties": {
             "javascript": { "$ref": "#/$defs/sec03EcosystemMode" },
             "python": { "$ref": "#/$defs/sec03EcosystemMode" },
+            "dart": { "$ref": "#/$defs/sec03EcosystemMode" },
             "go": { "$ref": "#/$defs/sec03EcosystemMode" },
             "rust": { "$ref": "#/$defs/sec03EcosystemMode" },
             "ruby": { "$ref": "#/$defs/sec03EcosystemMode" },

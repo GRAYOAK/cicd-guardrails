@@ -534,6 +534,7 @@ run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when pyproject has no satisfier lockfile" 1 "$LAST_EXIT"
 assert_output_contains "reports missing python satisfier" "missing a required lock or hashed requirements"
 assert_output_contains "Python-only repo skips JavaScript" "JavaScript/TypeScript ecosystems.yml policy: skipped"
+assert_output_contains "Python-only repo skips Dart" "Dart ecosystems.yml policy: skipped"
 assert_output_contains "Python-only repo skips Rust" "Rust ecosystems.yml policy: skipped"
 assert_output_contains "Python-only repo skips Ruby" "Ruby ecosystems.yml policy: skipped"
 assert_output_contains "Python-only repo skips PHP" "PHP ecosystems.yml policy: skipped"
@@ -675,6 +676,45 @@ printf '' >"$TMP/services/not-a-go-project/go.sum"
 run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "passes without a go.mod detection file" 0 "$LAST_EXIT"
 assert_output_contains "records skipped Go audit" "Go ecosystems.yml policy: skipped; no configured detection files (go.mod) found in inventory."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh validates Dart ecosystems.yml rules"
+setup
+mkdir -p "$TMP/services/dart-app"
+cat >"$TMP/services/dart-app/pubspec.yaml" <<'EOF'
+name: dart_app
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+EOF
+printf 'packages:\n' >"$TMP/services/dart-app/pubspec.lock"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "passes when pubspec.yaml has a nonempty same-directory pubspec.lock" 0 "$LAST_EXIT"
+printf '' >"$TMP/services/dart-app/pubspec.lock"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "fails when pubspec.lock is empty" 1 "$LAST_EXIT"
+assert_output_contains "reports empty Dart lockfile" "pubspec.lock is empty."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh fails for missing Dart lockfile"
+setup
+mkdir -p "$TMP/services/dart-app"
+printf 'name: dart_app\n' >"$TMP/services/dart-app/pubspec.yaml"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "fails when pubspec.yaml has no pubspec.lock" 1 "$LAST_EXIT"
+assert_output_contains "reports missing Dart lockfile" "Missing pubspec.lock next to pubspec.yaml."
+assert_output_contains "reports Dart remediation loaded from YAML" "Run dart pub get or flutter pub get and commit pubspec.lock."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh skips orphan pubspec.lock"
+setup
+mkdir -p "$TMP/services/not-a-dart-project"
+printf '' >"$TMP/services/not-a-dart-project/pubspec.lock"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "passes without a pubspec.yaml detection file" 0 "$LAST_EXIT"
+assert_output_contains "records skipped Dart audit" "Dart ecosystems.yml policy: skipped; no configured detection files (pubspec.yaml) found in inventory."
 teardown
 
 echo ""
@@ -1051,6 +1091,23 @@ EOF
   assert_output_not_contains "Go off suppresses the missing go.sum finding" "Missing go.sum"
   assert_output_contains "Go off is visible in coverage" "Go skipped by config"
   assert_output_not_contains "ecosystem off does not skip the whole check" "Status: **SKIPPED**"
+  teardown
+
+  echo ""
+  echo "▶ SEC-03 disables Dart while keeping the check active"
+  setup
+  printf 'name: dart_off\n' >"$TMP/pubspec.yaml"
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    ecosystems:
+      dart: off
+EOF
+  run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+  assert_exit "Dart off keeps a broken Dart-only repo green" 0 "$LAST_EXIT"
+  assert_output_not_contains "Dart off suppresses the missing pubspec.lock finding" "Missing pubspec.lock"
+  assert_output_contains "Dart off is visible in coverage" "Dart skipped by config"
+  assert_output_not_contains "Dart off does not skip the whole check" "Status: **SKIPPED**"
   teardown
 
   echo ""

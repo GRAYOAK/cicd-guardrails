@@ -50,7 +50,7 @@ fp_init "$PATH_ROOT"
 pp_init "$PATH_ROOT"
 trap pp_cleanup EXIT
 
-fb_add_searched "Inventory-gated package policies (Python, JavaScript/TypeScript/Bun, Go, Rust, Ruby, PHP)"
+fb_add_searched "Inventory-gated package policies (Python, JavaScript/TypeScript/Bun, Dart, Go, Rust, Ruby, PHP)"
 fb_add_searched "Unsupported dependency signals (Maven, Gradle, NuGet, Deno, Pipenv, Conda)"
 fb_add_searched "GitHub workflow YAML files for third-party action SHA pins"
 fb_add_searched "Dockerfiles for digest-pinned base images"
@@ -221,6 +221,7 @@ sec03_ecosystem_detect_names() {
 sec03_ecosystem_label() {
   case "$1" in
     javascript) printf '%s' "JavaScript/TypeScript" ;;
+    dart) printf '%s' "Dart" ;;
     go) printf '%s' "Go" ;;
     rust) printf '%s' "Rust" ;;
     ruby) printf '%s' "Ruby" ;;
@@ -286,7 +287,7 @@ sec03_report_config_notices() {
   while IFS= read -r ecosystem_id; do
     [[ -z "$ecosystem_id" ]] && continue
     fb_report "notice" "Unknown SEC-03 ecosystem key '${ecosystem_id}'; ignoring it." \
-      ".guardrails.yml" "" "Use one of: javascript, python, go, rust, ruby, php." "configuration"
+      ".guardrails.yml" "" "Use one of: javascript, python, dart, go, rust, ruby, php." "configuration"
   done < <(cfg_sec03_unknown_ecosystem_keys)
 
   while IFS= read -r invalid_entry; do
@@ -336,10 +337,10 @@ sec03_phase_unsupported_ecosystems
 sec03_phase_workflows_and_dockerfiles
 
 fb_phase "summary"
-for sec03_name in package.json go.mod Cargo.toml Gemfile composer.json package-lock.json yarn.lock pnpm-lock.yaml bun.lockb go.sum Cargo.lock Gemfile.lock composer.lock; do
+for sec03_name in package.json pubspec.yaml go.mod Cargo.toml Gemfile composer.json package-lock.json yarn.lock pnpm-lock.yaml bun.lockb pubspec.lock go.sum Cargo.lock Gemfile.lock composer.lock; do
   mapfile -t sec03_files < <(sec03_inventory_paths "$sec03_name")
   case "$sec03_name" in
-    package.json|go.mod|Cargo.toml|Gemfile|composer.json)
+    package.json|pubspec.yaml|go.mod|Cargo.toml|Gemfile|composer.json)
       sec03__coverage_inventory "Manifest" "$sec03_name" "${sec03_files[@]+"${sec03_files[@]}"}"
       ;;
     *)

@@ -34,6 +34,30 @@
 2. Keep reasons and fix-order text deterministic and explicit.
 3. Validate with at least one failing fixture and one passing fixture.
 
+## Add a sibling-lock ecosystem
+
+Declare straightforward manifest/lock pairs in `scripts/config/ecosystems.yml` instead of creating a language-specific shell runner:
+
+```yaml
+ecosystems:
+  example:
+    detect:
+      any_files: [example.yaml]
+    files:
+      - name: example.yaml
+        rules:
+          - require_sibling: [example.lock]
+            message: "Missing example.lock next to example.yaml."
+            remediation: "Generate and commit example.lock."
+      - name: example.lock
+        rules:
+          - not_empty: true
+            message: "example.lock is empty."
+            remediation: "Generate and commit example.lock."
+```
+
+Use `contains` only when the lock format has a stable marker worth validating. Keep detection manifest-led so an orphan lockfile does not activate the ecosystem audit.
+
 ## Keep consumer demo wiring up to date
 
 When changes affect reusable workflow usage in `cicd-demo-errors`:

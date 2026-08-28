@@ -17,10 +17,11 @@ checks:
   CICD-SEC-03-DEPENDENCY-CHAIN:
     mode: fail
     # Optional SEC-03 language gates. Omitted ecosystems default to fail.
-    # Valid IDs: javascript, python, go, rust, ruby, php.
+    # Valid IDs: javascript, python, dart, go, rust, ruby, php.
     ecosystems:
       javascript: fail
       python: fail
+      dart: fail
       go: fail
       rust: fail
       ruby: fail

@@ -76,7 +76,7 @@ cfg_check_mode() {
 
 cfg__sec03_ecosystem_id_known() {
   case "$1" in
-    javascript|python|go|rust|ruby|php) return 0 ;;
+    javascript|python|dart|go|rust|ruby|php) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -147,7 +147,7 @@ cfg_sec03_unknown_ecosystem_keys() {
 cfg_sec03_invalid_ecosystem_values() {
   local ecosystem_id val
 
-  for ecosystem_id in javascript python go rust ruby php; do
+  for ecosystem_id in javascript python dart go rust ruby php; do
     val="$(cfg__sec03_ecosystem_raw_value "$ecosystem_id")"
     case "$val" in
       ""|fail|off) ;;
