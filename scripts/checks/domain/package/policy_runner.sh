@@ -4,6 +4,18 @@ set -euo pipefail
 
 ECOSYSTEM_POLICY_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../config" && pwd)/ecosystems.yml"
 
+ecosystem_policy_ids() {
+  awk '
+    /^ecosystems:/ { in_ecosystems = 1; next }
+    in_ecosystems && /^  [a-zA-Z0-9_-]+:$/ {
+      value = $0
+      sub(/^  /, "", value)
+      sub(/:$/, "", value)
+      print value
+    }
+  ' "$ECOSYSTEM_POLICY_CONFIG"
+}
+
 ecosystem_policy_detect_names() {
   local ecosystem="$1"
   awk -v ecosystem="$ecosystem" '
@@ -38,7 +50,7 @@ ecosystem_policy_file_names() {
   ' "$ECOSYSTEM_POLICY_CONFIG"
 }
 
-# Emits: file name, rule type, rule argument, message, remediation.
+# Emits: file name, rule type, rule argument, minimum bytes, message, remediation.
 ecosystem_policy_rule_records() {
   local ecosystem="$1"
   awk -v ecosystem="$ecosystem" '
@@ -49,8 +61,8 @@ ecosystem_policy_rule_records() {
     }
     function emit() {
       if (file != "" && rule != "") {
-        print file "|" rule "|" argument "|" message "|" remediation
-        rule = argument = message = remediation = ""
+        print file "|" rule "|" argument "|" minimum_bytes "|" message "|" remediation
+        rule = argument = minimum_bytes = message = remediation = ""
       }
     }
     $0 == "  " ecosystem ":" { in_ecosystem = 1; next }
@@ -60,7 +72,7 @@ ecosystem_policy_rule_records() {
       file = $0
       sub(/^      - name: /, "", file)
       file = clean(file)
-      rule = argument = message = remediation = ""
+      rule = argument = minimum_bytes = message = remediation = ""
       next
     }
     file != "" && /^          - require_sibling: / {
@@ -80,6 +92,30 @@ ecosystem_policy_rule_records() {
       message = remediation = ""
       next
     }
+    file != "" && /^          - contains: / {
+      emit()
+      rule = "contains"
+      argument = $0
+      sub(/^          - contains: /, "", argument)
+      argument = clean(argument)
+      message = remediation = ""
+      next
+    }
+    file != "" && /^          - validator: / {
+      emit()
+      rule = "validator"
+      argument = $0
+      sub(/^          - validator: /, "", argument)
+      argument = clean(argument)
+      message = remediation = ""
+      next
+    }
+    rule != "" && /^            minimum_bytes: / {
+      minimum_bytes = $0
+      sub(/^            minimum_bytes: /, "", minimum_bytes)
+      minimum_bytes = clean(minimum_bytes)
+      next
+    }
     rule != "" && /^            message: / {
       message = $0
       sub(/^            message: /, "", message)
@@ -96,6 +132,35 @@ ecosystem_policy_rule_records() {
   ' "$ECOSYSTEM_POLICY_CONFIG"
 }
 
+cicd_sec_03_run_named_validator() {
+  local validator="$1"
+  local path_root="$2"
+  local target="$3"
+  local ecosystem="$4"
+  local context="${5:-$target}"
+  case "$validator" in
+    javascript_package_policy) sec03_validate_javascript_package_policy "$path_root" "$context" ;;
+    package_json_exact_specs) sec03_validate_package_json_exact_specs "$path_root" "$target" ;;
+    npm_lock_integrity) sec03_validate_npm_lock_integrity "$path_root" "$target" ;;
+    yarn_lock_integrity) sec03_validate_yarn_lock_integrity "$path_root" "$target" ;;
+    pnpm_lock_integrity) sec03_validate_pnpm_lock_integrity "$path_root" "$target" ;;
+    pip_requirements_txt_hashes) sec03_validate_pip_requirements_txt_hashes "$path_root" "$target" ;;
+    poetry_lock_hashes) sec03_validate_poetry_lock_hashes "$path_root" "$target" ;;
+    uv_lock_hashes) sec03_validate_uv_lock_hashes "$path_root" "$target" ;;
+    nonempty_file)
+      if [[ ! -s "$target" ]]; then
+        fb_report "error" "$(basename "$target") is empty." "$(pkg_rel_path "$path_root" "$target")" "" \
+          "Regenerate the lockfile with the selected package manager and commit it." "$ecosystem"
+      fi
+      ;;
+    *)
+      fb_report "error" "Unknown SEC-03 validator '${validator}'; policy execution cannot continue safely." \
+        "$(pkg_rel_path "$path_root" "$target")" "" \
+        "Fix the validator name in the shipped policy or repository overlay." "$ecosystem"
+      ;;
+  esac
+}
+
 cicd_sec_03_run_ecosystem_policy() {
   local path_root="$1"
   local ecosystem="$2"
@@ -103,7 +168,7 @@ cicd_sec_03_run_ecosystem_policy() {
   local -a detectors=("$@")
   local -a required_siblings=()
   local -A audited_directories=()
-  local detector rel dir file rule argument message remediation target sibling
+  local detector rel dir file rule argument minimum_bytes message remediation target sibling size
 
   for detector in "${detectors[@]+"${detectors[@]}"}"; do
     [[ -n "$detector" && -f "$detector" ]] || continue
@@ -113,7 +178,7 @@ cicd_sec_03_run_ecosystem_policy() {
     [[ -n "${audited_directories[$dir]+set}" ]] && continue
     audited_directories["$dir"]=1
 
-    while IFS='|' read -r file rule argument message remediation; do
+    while IFS='|' read -r file rule argument minimum_bytes message remediation; do
       [[ -n "$file" && -n "$rule" ]] || continue
       target="${dir}/${file}"
       case "$rule" in
@@ -134,8 +199,22 @@ cicd_sec_03_run_ecosystem_policy() {
               "$remediation" "$ecosystem"
           fi
           ;;
+        contains)
+          if [[ -f "$target" ]]; then
+            size="$(wc -c <"$target" 2>/dev/null || echo 0)"
+            if [[ -z "$minimum_bytes" || "$size" -ge "$minimum_bytes" ]]; then
+              if ! grep -qE -- "$argument" "$target" 2>/dev/null; then
+                fb_report "error" "$message" "$(pkg_rel_path "$path_root" "$target")" "" \
+                  "$remediation" "$ecosystem"
+              fi
+            fi
+          fi
+          ;;
+        validator)
+          cicd_sec_03_run_named_validator "$argument" "$path_root" "$target" "$ecosystem" "$detector"
+          ;;
         *)
-          fb_report "warning" "Unknown ${ecosystem} ecosystem policy rule '${rule}'." \
+          fb_report "error" "Unknown ${ecosystem} ecosystem policy rule '${rule}'." \
             "$(pkg_rel_path "$path_root" "$target")" "" \
             "Fix scripts/config/ecosystems.yml." "$ecosystem"
           ;;

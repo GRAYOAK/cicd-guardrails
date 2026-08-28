@@ -6,22 +6,22 @@
 #
 # policy_handler / artifact        implementation (relative to guardrails repo)
 # ---------------------------------------------------------------------------
-# js_ts / package.json             package_policy.javascript + scripts/checks/domain/package/js_ts.sh
-# js_ts / tsconfig.json            same — exact TypeScript project trigger
-# js_ts / jsconfig.json            same — exact JavaScript project trigger
-# js_ts / package-lock.json        same — cicd_sec_03_audit_js_ts_lock_package_lock
-# js_ts / yarn.lock                same — cicd_sec_03_audit_js_ts_lock_yarn
-# js_ts / pnpm-lock.yaml           same — cicd_sec_03_audit_js_ts_lock_pnpm
-# js_ts / bun.lockb                same — nonempty_file validator
-# python / (directory policy)      scripts/config/package_policy.defaults.yml + scripts/lib/package_policy.sh + scripts/checks/domain/package/python.sh — cicd_sec_03_run_python_package_policy
+# javascript / package.json        ecosystems.yml + package_policy.javascript + named validators
+# javascript / tsconfig.json       same — exact TypeScript project trigger
+# javascript / jsconfig.json       same — exact JavaScript project trigger
+# javascript / package-lock.json   same — npm_lock_integrity validator
+# javascript / yarn.lock           same — yarn_lock_integrity validator
+# javascript / pnpm-lock.yaml      same — pnpm_lock_integrity validator
+# javascript / bun.lockb           same — nonempty_file validator
+# python / (directory policy)      package_policy.defaults.yml + package_policy.sh + validators.sh
 # go / go.mod                      scripts/config/ecosystems.yml + schema-driven policy runner
 # go / go.sum                      same — not_empty rule
-# rust / Cargo.toml                scripts/checks/domain/package/rust.sh — cicd_sec_03_audit_rust_cargo_toml
-# rust / Cargo.lock                same — cicd_sec_03_audit_rust_cargo_lock
-# ruby / Gemfile                   scripts/checks/domain/package/ruby.sh — cicd_sec_03_audit_ruby_gemfile
-# ruby / Gemfile.lock              same — cicd_sec_03_audit_ruby_gemfile_lock
-# php / composer.json              scripts/checks/domain/package/php.sh — cicd_sec_03_audit_php_composer_json
-# php / composer.lock              same — cicd_sec_03_audit_php_composer_lock
+# rust / Cargo.toml                ecosystems.yml — require_sibling rule
+# rust / Cargo.lock                same — not_empty + contains primitives
+# ruby / Gemfile                   ecosystems.yml — require_sibling rule
+# ruby / Gemfile.lock              same — not_empty primitive
+# php / composer.json              ecosystems.yml — require_sibling rule
+# php / composer.lock              same — not_empty + contains primitives
 # workflows / *.yml, *.yaml       scripts/lib/action_pin_audit.sh — action_pin_scan_file (ecosystem workflows)
 # docker / Dockerfile*             scripts/lib/dockerfile_pin_audit.sh — dockerfile_pin_scan_file
 # composite-action / action.yml  scripts/lib/action_pin_audit.sh — action_pin_scan_file (ecosystem composite-action)

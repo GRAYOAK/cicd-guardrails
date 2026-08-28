@@ -533,6 +533,10 @@ EOF
 run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when pyproject has no satisfier lockfile" 1 "$LAST_EXIT"
 assert_output_contains "reports missing python satisfier" "missing a required lock or hashed requirements"
+assert_output_contains "Python-only repo skips JavaScript" "JavaScript/TypeScript ecosystems.yml policy: skipped"
+assert_output_contains "Python-only repo skips Rust" "Rust ecosystems.yml policy: skipped"
+assert_output_contains "Python-only repo skips Ruby" "Ruby ecosystems.yml policy: skipped"
+assert_output_contains "Python-only repo skips PHP" "PHP ecosystems.yml policy: skipped"
 teardown
 
 echo ""
@@ -702,6 +706,60 @@ run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when Gemfile or composer.json has no lockfile" 1 "$LAST_EXIT"
 assert_output_contains "reports missing ruby lockfile" "Missing Gemfile.lock next to Gemfile."
 assert_output_contains "reports missing php lockfile" "Missing composer.lock next to composer.json."
+teardown
+
+echo ""
+echo "▶ cicd_sec_03_dependency_chain.sh runs lock primitives from ecosystems.yml"
+setup
+printf '[package]\nname = "demo"\nversion = "0.1.0"\n' >"$TMP/Cargo.toml"
+printf '%090d\n' 0 >"$TMP/Cargo.lock"
+echo 'source "https://rubygems.org"' >"$TMP/Gemfile"
+: >"$TMP/Gemfile.lock"
+echo '{"name":"acme/demo"}' >"$TMP/composer.json"
+printf '%0130d\n' 0 >"$TMP/composer.lock"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "fails invalid Rust, Ruby, and PHP lockfiles" 1 "$LAST_EXIT"
+assert_output_contains "runs Rust contains primitive" "Cargo.lock appears invalid."
+assert_output_contains "runs Ruby nonempty primitive" "Gemfile.lock is empty."
+assert_output_contains "runs PHP contains primitive" "composer.lock missing packages section"
+teardown
+
+echo ""
+echo "▶ SEC-03 fails closed for unknown YAML validators"
+setup
+touch "$TMP/manifest.test"
+cat >"$TMP/ecosystems.yml" <<'EOF'
+ecosystems:
+  test:
+    detect:
+      any_files: [manifest.test]
+    files:
+      - name: manifest.test
+        rules:
+          - validator: validator_does_not_exist
+EOF
+export SEC03_TEST_ROOT="$TMP"
+export SEC03_TEST_REPO_ROOT="$ROOT_DIR"
+cat >"$TMP/run-unknown-validator.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+source "${SEC03_TEST_REPO_ROOT}/scripts/lib/feedback.sh"
+source "${SEC03_TEST_REPO_ROOT}/scripts/lib/file_patterns.sh"
+source "${SEC03_TEST_REPO_ROOT}/scripts/lib/package_scan.sh"
+source "${SEC03_TEST_REPO_ROOT}/scripts/checks/domain/package/validators.sh"
+source "${SEC03_TEST_REPO_ROOT}/scripts/checks/domain/package/policy_runner.sh"
+ECOSYSTEM_POLICY_CONFIG="${SEC03_TEST_ROOT}/ecosystems.yml"
+fb_init "CICD-SEC-03-DEPENDENCY-CHAIN" "Dependency chain check" "https://owasp.org/"
+fp_init "$SEC03_TEST_ROOT"
+cicd_sec_03_run_ecosystem_policy "$SEC03_TEST_ROOT" "test" "$SEC03_TEST_ROOT/manifest.test"
+fb_auto_status false
+fb_summary
+exit "$(fb_exit_code false false)"
+EOF
+run_check "$TMP/run-unknown-validator.sh"
+unset SEC03_TEST_ROOT SEC03_TEST_REPO_ROOT
+assert_exit "unknown validator is an error finding" 1 "$LAST_EXIT"
+assert_output_contains "unknown validator names the misconfiguration" "Unknown SEC-03 validator 'validator_does_not_exist'"
 teardown
 
 echo ""
@@ -1257,6 +1315,20 @@ EOF
   else
     echo "  ❌ ecosystems.yml Go policy drifts from the Epic schema"
     diff -u <(yq eval -oj '.ecosystems.go' "$ECOSYSTEMS_YML") <(yq eval -oj '.' "$EXPECTED_GO_ECOSYSTEM") || true
+    FAIL=$((FAIL + 1))
+  fi
+  if [[ "$(yq -r '.ecosystems.javascript.files[] | select(.name == "package.json") | .rules[].validator' "$ECOSYSTEMS_YML")" == "javascript_package_policy" ]]; then
+    echo "  ✅ ecosystems.yml dispatches JavaScript through a named validator"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ ecosystems.yml does not dispatch JavaScript through its named validator"
+    FAIL=$((FAIL + 1))
+  fi
+  if ! grep -Eq 'source .*(js_ts|python|rust|ruby|php)\.sh' "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh"; then
+    echo "  ✅ SEC-03 no longer sources legacy ecosystem audit scripts"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ SEC-03 still sources a legacy ecosystem audit script"
     FAIL=$((FAIL + 1))
   fi
   rm -f "$EXPECTED_GO_ECOSYSTEM"
