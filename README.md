@@ -115,7 +115,7 @@ Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designa
 | Designation | Job-ID | Skript | Scope | Was wird erkannt |
 |---|---|---|---|---|
 | `CICD-SEC-01-FLOW` | `cicd-sec-01-flow` | `scripts/checks/domain/cicd_sec_01_flow.sh` | Settings | Branch-Flow-Kontrollen: PR-Pflicht, Approvals, force-push/delete Regeln |
-| `CICD-SEC-03-DEPENDENCY-CHAIN` | `cicd-sec-03-dependency-chain` | `scripts/checks/domain/cicd_sec_03_dependency_chain.sh` | Code | Inventar-gesteuerte Package-Prüfung: Python und JavaScript/TypeScript/Bun (`package_policy`), Go (`ecosystems.yml`), Rust, Ruby und PHP; Hinweise für erkannte nicht unterstützte Ökosysteme; Workflow-`uses:`-SHA-Pins; Dockerfile-Digests |
+| `CICD-SEC-03-DEPENDENCY-CHAIN` | `cicd-sec-03-dependency-chain` | `scripts/checks/domain/cicd_sec_03_dependency_chain.sh` | Code | Inventar-gesteuerte Package-Prüfung: Python und JavaScript/TypeScript/Bun (`package_policy`), Dart, Go, Rust, Ruby und PHP (`ecosystems.yml`); Hinweise für erkannte nicht unterstützte Ökosysteme; Workflow-`uses:`-SHA-Pins; Dockerfile-Digests |
 | `CICD-SEC-04-POISONED-PIPELINE` | `cicd-sec-04-poisoned-pipeline` | `scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh` | Code | `pull_request_target` Verwendung (Poisoned Pipeline Execution) |
 | `CICD-SEC-05-PERMISSIONS` | `cicd-sec-05-permissions` | `scripts/checks/domain/cicd_sec_05_permissions.sh` | Code | Fehlende `permissions:` Blöcke auf Top-Level oder Job-Ebene |
 | `CICD-SEC-05-BRANCH` | `cicd-sec-05-branch` | `scripts/checks/domain/cicd_sec_05_branch.sh` | Settings | Branch-Governance: Admin-Enforcement, stale reviews, code-owner policy |
@@ -266,7 +266,7 @@ Optional kann das Ziel-Repo **zusätzliche** Einträge setzen:
 
 Merge-Verhalten: Ohne `yq` werden die mitgelieferten Default-Dateien unverändert verwendet. Mit `yq` werden die jeweiligen `package_policy.python`- und `package_policy.javascript`-Schlüssel aus dem Overlay per Objekt-Merge über die Defaults gelegt (Arrays und Maps aus dem Overlay ersetzen die gleichnamigen Defaults vollständig). Pfade mit Leerzeichen werden beim Merge über Umgebungsvariablen geladen.
 
-**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Python-/JavaScript-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Go, Rust, Ruby und PHP sowie der JavaScript-Einstieg in die Validator-Registry werden durch [`scripts/config/ecosystems.yml`](scripts/config/ecosystems.yml) definiert. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre `global_excludes`- sowie Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
+**Single source of truth (Reihenfolge):** eingebaute `find`-Ausschlüsse, danach die flachen Python-/JavaScript-Defaults unter `scripts/config/`, zuletzt optional das Overlay im Zielrepo. Dart, Go, Rust, Ruby und PHP sowie der JavaScript-Einstieg in die Validator-Registry werden durch [`scripts/config/ecosystems.yml`](scripts/config/ecosystems.yml) definiert. Die Datei [`.guardrails.file-patterns.reference.yml`](.guardrails.file-patterns.reference.yml) ist **nur Dokumentation**; Tests halten ihre `global_excludes`- sowie Python- und JavaScript-Blöcke synchron zu den Runtime-Defaults.
 
 SEC-03 baut mit einem repo-weiten Datei-Walk ein Basename-Inventar auf und startet einen Sprach-Checker nur, wenn mindestens ein konfigurierter Trigger vorhanden ist und das Ökosystem nicht per `.guardrails.yml` abgeschaltet wurde. Workflow-YAMLs werden separat und ausschließlich unter `.github/workflows` gesammelt. Das Scan-Coverage nennt ausgelassene Sprachen ausdrücklich. Erkannte `pom.xml`, `build.gradle`, `build.gradle.kts`, `*.csproj`, `*.fsproj`, `packages.lock.json`, `deno.json`, `Pipfile` und `environment.yml` erzeugen standardmäßig lediglich Notices; sie ändern den Exit-Code nicht.
 
@@ -350,6 +350,7 @@ checks:
     ecosystems:
       javascript: fail
       python: fail
+      dart: fail
       go: off
       rust: fail
       ruby: fail
@@ -357,7 +358,7 @@ checks:
     unsupported_ecosystems: off
 ```
 
-- Erlaubte IDs sind `javascript`, `python`, `go`, `rust`, `ruby` und `php`; ausgelassene IDs laufen mit `fail`.
+- Erlaubte IDs sind `javascript`, `python`, `dart`, `go`, `rust`, `ruby` und `php`; ausgelassene IDs laufen mit `fail`.
 - `off` überspringt den jeweiligen Sprach-Runner und wird im Scan-Coverage als „skipped by config“ sichtbar, auch wenn keine Dateien dieser Sprache existieren.
 - `unsupported_ecosystems` ist `notice` (Default) oder `off`; `off` unterdrückt Maven-/Gradle-/NuGet-/Deno-/Pipenv-/Conda-Hinweise.
 - Unbekannte IDs werden mit Notice ignoriert. Ungültige Werte für bekannte IDs erzeugen eine Notice und fallen sicher auf `fail` zurück.
@@ -474,7 +475,7 @@ In CI prüft [`.github/workflows/self-test.yml`](.github/workflows/self-test.yml
 - output: findings via shared reporting library
 - exit semantics: `0` (pass/warn), `1` (fail), `2` (missing runtime dependency)
 
-Die Engine besteht aus `scripts/checks/domain/package/policy_runner.sh` (Detection, Primitives und fail-closed Validator-Dispatch) und `validators.sh` (benannte JS-/Python-Validatoren). `ecosystems.yml` deklariert Go, Rust, Ruby, PHP und JavaScript. Python bleibt wegen seines Overlay-Modells in `package_policy.defaults.yml`, wird aber von derselben Validator-Registry ausgeführt. Unbekannte `validator:`-Namen erzeugen ein Error-Finding, damit eine Fehlkonfiguration keine Prüfung stillschweigend deaktiviert.
+Die Engine besteht aus `scripts/checks/domain/package/policy_runner.sh` (Detection, Primitives und fail-closed Validator-Dispatch) und `validators.sh` (benannte JS-/Python-Validatoren). `ecosystems.yml` deklariert Dart, Go, Rust, Ruby, PHP und JavaScript. Python bleibt wegen seines Overlay-Modells in `package_policy.defaults.yml`, wird aber von derselben Validator-Registry ausgeführt. Unbekannte `validator:`-Namen erzeugen ein Error-Finding, damit eine Fehlkonfiguration keine Prüfung stillschweigend deaktiviert.
 
 Das unterstützt Repositories mit einem Service im Root und Monorepos mit vielen verschachtelten Services.
 
@@ -488,7 +489,7 @@ Für JavaScript/TypeScript gilt pro Projektverzeichnis:
 - npm-v2/v3-Integrität, Yarn-v1-Integrity bzw. Yarn-Berry-Checksums und pnpm-Integrity werden geprüft
 - `bun.lockb` bleibt Teil der JavaScript-Policy und muss nicht leer sein
 
-Go, Rust, Ruby und PHP nutzen das Schema unter `scripts/config/ecosystems.yml`: `detect.any_files` aktiviert den Audit, `require_sibling` und `not_empty` bilden die Lockfile-Regeln ab. Rust und PHP behalten ihre bisherigen kleinen `contains`-Prüfungen samt Mindestgröße. JavaScript referenziert dort den benannten `javascript_package_policy`-Validator; dessen Trigger-, Satisfier- und Integritätszuordnung stammt weiterhin aus den mergebaren JavaScript-Defaults. Meldungen und Remediation für YAML-Primitives kommen direkt aus YAML. Fehlt ein Detection-Trigger, wird das Ökosystem nicht auditiert.
+Dart, Go, Rust, Ruby und PHP nutzen das Schema unter `scripts/config/ecosystems.yml`: `detect.any_files` aktiviert den Audit, `require_sibling` und `not_empty` bilden die Lockfile-Regeln ab. Für Dart muss neben `pubspec.yaml` eine nicht leere `pubspec.lock` liegen; erzeugt wird sie mit `dart pub get` oder `flutter pub get`. Rust und PHP behalten ihre bisherigen kleinen `contains`-Prüfungen samt Mindestgröße. JavaScript referenziert dort den benannten `javascript_package_policy`-Validator; dessen Trigger-, Satisfier- und Integritätszuordnung stammt weiterhin aus den mergebaren JavaScript-Defaults. Meldungen und Remediation für YAML-Primitives kommen direkt aus YAML. Fehlt ein Detection-Trigger, wird das Ökosystem nicht auditiert.
 
 ---
 

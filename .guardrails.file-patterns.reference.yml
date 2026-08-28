@@ -14,6 +14,8 @@
 # javascript / pnpm-lock.yaml      same — pnpm_lock_integrity validator
 # javascript / bun.lockb           same — nonempty_file validator
 # python / (directory policy)      package_policy.defaults.yml + package_policy.sh + validators.sh
+# dart / pubspec.yaml              ecosystems.yml — require_sibling rule
+# dart / pubspec.lock              same — not_empty primitive
 # go / go.mod                      scripts/config/ecosystems.yml + schema-driven policy runner
 # go / go.sum                      same — not_empty rule
 # rust / Cargo.toml                ecosystems.yml — require_sibling rule

@@ -1,6 +1,20 @@
 # Schema-driven CICD-SEC-03 ecosystem policies.
 
 ecosystems:
+  dart:
+    detect:
+      any_files: [pubspec.yaml]
+    files:
+      - name: pubspec.yaml
+        rules:
+          - require_sibling: [pubspec.lock]
+            message: "Missing pubspec.lock next to pubspec.yaml."
+            remediation: "Run dart pub get or flutter pub get and commit pubspec.lock."
+      - name: pubspec.lock
+        rules:
+          - not_empty: true
+            message: "pubspec.lock is empty."
+            remediation: "Run dart pub get or flutter pub get and commit pubspec.lock."
   go:
     detect:
       any_files: [go.mod]

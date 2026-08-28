@@ -105,6 +105,16 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
    - If split is recommended, include a proposed target structure and migration order.
 12. Always finish with a learning proposal block that the user can accept or reject per item.
 
+### Add a SEC-03 language policy
+
+1. Add detection and file rules to `scripts/config/ecosystems.yml`; prefer existing YAML primitives such as `require_sibling` and `not_empty` when they express the policy.
+2. Add the public ecosystem ID to the hardcoded allowlist and invalid-value loop in `scripts/lib/config.sh`; do not derive the allowlist from YAML.
+3. Add the ecosystem gate to `.guardrails.schema.json`, `.guardrails.example.yml`, and `reference-risk-model.md`.
+4. Wire the public label, searched text, config remediation, and manifest/lock coverage names in `cicd_sec_03_dependency_chain.sh` without adding a second repository walk.
+5. Extend `.pre-commit-hooks.yaml` so manifest and lockfile changes trigger SEC-03.
+6. Test compliant, missing-lock, empty-lock, orphan-lock, and `off` cases in `tests/test_checks.sh`, including skip visibility from an unrelated language fixture.
+7. Update README, `.guardrails.file-patterns.reference.yml`, the sibling-lock playbook, and consumer/demo migration guidance.
+
 ### Release, changelog, and migrations (mandatory)
 
 - **`CHANGELOG.md`**: this repository uses **release-please** (`release.yml` + `release-please-config.json`). Do **not** hand-edit the changelog when the file header states automation ownership. Ship user-visible history through **Conventional Commits** (`feat:`, `fix:`, `perf:`, …) so the release PR updates `CHANGELOG.md`.
