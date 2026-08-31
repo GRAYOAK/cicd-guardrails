@@ -91,8 +91,24 @@ bash scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh <repo-root>
 ### Tests
 
 ```bash
-bash tests/test_checks.sh
+task test          # bash tests/test_checks.sh
+task test:demos    # bash tests/test_demo_repos.sh (sibling demo trees)
 ```
+
+Equivalent without Task: `bash tests/test_checks.sh` and `bash tests/test_demo_repos.sh`.
+
+`test:demos` is a **local** harness. Do not add it as a required CI job on every producer PR.
+
+### Demo / fixture repositories (mitziehen)
+
+Canonical GRAYOAK fixtures (not the legacy `cicd-demo-*` / Christopher-Rust names):
+
+| Role | Repository | Default local path |
+|------|------------|--------------------|
+| Positive (compliant) | [GRAYOAK/cicd-guardrails-demo-well](https://github.com/GRAYOAK/cicd-guardrails-demo-well) | sibling `../cicd-guardrails-demo-well` or `GUARDRAILS_DEMO_WELL_PATH` |
+| Negative (intentional findings) | [GRAYOAK/cicd-guardrails-demo-errors](https://github.com/GRAYOAK/cicd-guardrails-demo-errors) | sibling `../cicd-guardrails-demo-errors` or `GUARDRAILS_DEMO_ERRORS_PATH` |
+
+**Mitzieh-Pflicht:** when you change checks, reusable workflows, or hooks, update both demo repos in the same change set (fixtures, pins, hook filters) so `task test:demos` stays meaningful. File-based checks must stay green on well and red overall on errors (SEC-03 failing on errors is sufficient). Skip `CICD-SEC-01-FLOW` and `CICD-SEC-05-BRANCH` in that harness (API/token). A check exit `2` is infrastructure (missing `yq`/`gitleaks`/`jq`), not an expected errors-red.
 
 ### Configuration
 

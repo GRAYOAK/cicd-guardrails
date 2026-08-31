@@ -60,7 +60,7 @@ Use `contains` only when the lock format has a stable marker worth validating. K
 
 ## Keep consumer demo wiring up to date
 
-When changes affect reusable workflow usage in `cicd-demo-errors`:
+When changes affect reusable workflow usage in `GRAYOAK/cicd-guardrails-demo-errors` (sibling `../cicd-guardrails-demo-errors` or `GUARDRAILS_DEMO_ERRORS_PATH`; well counterpart `GRAYOAK/cicd-guardrails-demo-well` / `GUARDRAILS_DEMO_WELL_PATH`):
 1. Keep `Taskfile.dist.yml` paths relative.
 2. Prefer remote SHA resolution over local directory SHA:
    - `git ls-remote <guardrails-remote> HEAD | awk '{print $1}'`
