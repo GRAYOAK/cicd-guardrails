@@ -450,6 +450,10 @@ cicd-guardrails/
 
 ## Entwicklung an diesem Repository
 
+### Interne Präsentation
+
+Kurz-Outline (Ziel, Stand, Nutzung, Melden) und Demo-Skript: [`docs/presentation/`](docs/presentation/README.md).
+
 ### Regressionstests
 
 ```bash

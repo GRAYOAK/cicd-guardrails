@@ -125,4 +125,5 @@ For non-trivial changes to checks or workflows, follow `.agents/skills/go-adjust
 ## Human-oriented docs
 
 - `README.md` — integration, pinning, check table
+- `docs/presentation/` — intern/Onboarding outline and demo script (German)
 - `CHANGELOG.md` — release-please output (do not edit manually)
