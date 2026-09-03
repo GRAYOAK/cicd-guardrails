@@ -58,6 +58,8 @@ ecosystems:
 
 Use `contains` only when the lock format has a stable marker worth validating. Keep detection manifest-led so an orphan lockfile does not activate the ecosystem audit.
 
+For this Dart-like path, the remaining integration checklist is tests/demos plus the pre-commit file glob. IDs, labels, searched text, and coverage filenames come from the shipped YAML; do not add `package/<lang>.sh` or language-specific Bash glue. Overlay-class ecosystems, schema policy, and hook-glob changes remain separate paths.
+
 ## Keep consumer demo wiring up to date
 
 When changes affect reusable workflow usage in `GRAYOAK/cicd-guardrails-demo-errors` (sibling `../cicd-guardrails-demo-errors` or `GUARDRAILS_DEMO_ERRORS_PATH`; well counterpart `GRAYOAK/cicd-guardrails-demo-well` / `GUARDRAILS_DEMO_WELL_PATH`):

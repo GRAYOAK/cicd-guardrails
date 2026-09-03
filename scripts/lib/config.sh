@@ -7,6 +7,7 @@
 
 CFG_TARGET_DIR=""
 CFG_PATH=""
+CFG_SEC03_ECOSYSTEMS_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")/../config" && pwd)/ecosystems.yml"
 
 cfg_init() {
   CFG_TARGET_DIR="${1:-.}"
@@ -75,10 +76,25 @@ cfg_check_mode() {
 }
 
 cfg__sec03_ecosystem_id_known() {
-  case "$1" in
-    javascript|python|dart|go|rust|ruby|php) return 0 ;;
-    *) return 1 ;;
-  esac
+  local candidate="$1"
+  local ecosystem_id
+  while IFS= read -r ecosystem_id; do
+    [[ "$candidate" == "$ecosystem_id" ]] && return 0
+  done < <(cfg_sec03_ecosystem_ids)
+  return 1
+}
+
+cfg_sec03_ecosystem_ids() {
+  awk '
+    /^ecosystems:/ { in_ecosystems = 1; next }
+    in_ecosystems && /^  [a-zA-Z0-9_-]+:$/ {
+      value = $0
+      sub(/^  /, "", value)
+      sub(/:$/, "", value)
+      print value
+    }
+  ' "$CFG_SEC03_ECOSYSTEMS_CONFIG"
+  printf '%s\n' "python"
 }
 
 cfg__sec03_ecosystem_raw_value() {
@@ -147,11 +163,12 @@ cfg_sec03_unknown_ecosystem_keys() {
 cfg_sec03_invalid_ecosystem_values() {
   local ecosystem_id val
 
-  for ecosystem_id in javascript python dart go rust ruby php; do
+  while IFS= read -r ecosystem_id; do
+    [[ -z "$ecosystem_id" ]] && continue
     val="$(cfg__sec03_ecosystem_raw_value "$ecosystem_id")"
     case "$val" in
       ""|fail|off) ;;
       *) printf '%s=%s\n' "$ecosystem_id" "$val" ;;
     esac
-  done
+  done < <(cfg_sec03_ecosystem_ids)
 }

@@ -362,7 +362,7 @@ checks:
     unsupported_ecosystems: off
 ```
 
-- Erlaubte IDs sind `javascript`, `python`, `dart`, `go`, `rust`, `ruby` und `php`; ausgelassene IDs laufen mit `fail`.
+- Erlaubte IDs werden aus den Schlüsseln der ausgelieferten `scripts/config/ecosystems.yml` abgeleitet; `python` ist die einzige fest ergänzte Ausnahme. Ein Overlay oder eine testlokale YAML-Datei erweitert diese Allowlist nicht. Ausgelassene IDs laufen mit `fail`.
 - `off` überspringt den jeweiligen Sprach-Runner und wird im Scan-Coverage als „skipped by config“ sichtbar, auch wenn keine Dateien dieser Sprache existieren.
 - `unsupported_ecosystems` ist `notice` (Default) oder `off`; `off` unterdrückt Maven-/Gradle-/NuGet-/Deno-/Pipenv-/Conda-Hinweise.
 - Unbekannte IDs werden mit Notice ignoriert. Ungültige Werte für bekannte IDs erzeugen eine Notice und fallen sicher auf `fail` zurück.
@@ -487,7 +487,7 @@ In CI prüft [`.github/workflows/self-test.yml`](.github/workflows/self-test.yml
 - output: findings via shared reporting library
 - exit semantics: `0` (pass/warn), `1` (fail), `2` (missing runtime dependency)
 
-Die Engine besteht aus `scripts/checks/domain/package/policy_runner.sh` (Detection, Primitives und fail-closed Validator-Dispatch) und `validators.sh` (benannte JS-/Python-Validatoren). `ecosystems.yml` deklariert Dart, Go, Rust, Ruby, PHP und JavaScript. Python bleibt wegen seines Overlay-Modells in `package_policy.defaults.yml`, wird aber von derselben Validator-Registry ausgeführt. Unbekannte `validator:`-Namen erzeugen ein Error-Finding, damit eine Fehlkonfiguration keine Prüfung stillschweigend deaktiviert.
+Die Engine besteht aus `scripts/checks/domain/package/policy_runner.sh` (Detection, Primitives und fail-closed Validator-Dispatch) und `validators.sh` (benannte JS-/Python-Validatoren). `ecosystems.yml` deklariert Dart, Go, Rust, Ruby, PHP und JavaScript und liefert IDs, Labels, Suchumfang und Coverage-Dateinamen. Python bleibt wegen seines Overlay-Modells in `package_policy.defaults.yml`, wird aber von derselben Validator-Registry ausgeführt und als einzige Allowlist-Ausnahme ergänzt. Unbekannte `validator:`-Namen erzeugen ein Error-Finding, damit eine Fehlkonfiguration keine Prüfung stillschweigend deaktiviert.
 
 Das unterstützt Repositories mit einem Service im Root und Monorepos mit vielen verschachtelten Services.
 
@@ -501,7 +501,9 @@ Für JavaScript/TypeScript gilt pro Projektverzeichnis:
 - npm-v2/v3-Integrität, Yarn-v1-Integrity bzw. Yarn-Berry-Checksums und pnpm-Integrity werden geprüft
 - `bun.lockb` bleibt Teil der JavaScript-Policy und muss nicht leer sein
 
-Dart, Go, Rust, Ruby und PHP nutzen das Schema unter `scripts/config/ecosystems.yml`: `detect.any_files` aktiviert den Audit, `require_sibling` und `not_empty` bilden die Lockfile-Regeln ab. Für Dart muss neben `pubspec.yaml` eine nicht leere `pubspec.lock` liegen; erzeugt wird sie mit `dart pub get` oder `flutter pub get`. Rust und PHP behalten ihre bisherigen kleinen `contains`-Prüfungen samt Mindestgröße. JavaScript referenziert dort den benannten `javascript_package_policy`-Validator; dessen Trigger-, Satisfier- und Integritätszuordnung stammt weiterhin aus den mergebaren JavaScript-Defaults. Meldungen und Remediation für YAML-Primitives kommen direkt aus YAML. Fehlt ein Detection-Trigger, wird das Ökosystem nicht auditiert.
+Dart, Go, Rust, Ruby und PHP nutzen das Schema unter `scripts/config/ecosystems.yml`: `detect.any_files` aktiviert den Audit, `require_sibling` und `not_empty` bilden die Lockfile-Regeln ab. Für Dart muss neben `pubspec.yaml` eine nicht leere `pubspec.lock` liegen, die den stabilen Marker `packages:` enthält; erzeugt wird sie mit `dart pub get` oder `flutter pub get`. Rust und PHP behalten ihre bisherigen kleinen `contains`-Prüfungen samt Mindestgröße. JavaScript referenziert dort den benannten `javascript_package_policy`-Validator; dessen Trigger-, Satisfier- und Integritätszuordnung stammt weiterhin aus den mergebaren JavaScript-Defaults. Meldungen und Remediation für YAML-Primitives kommen direkt aus YAML. Fehlt ein Detection-Trigger, wird das Ökosystem nicht auditiert.
+
+Eine weitere Dart-artige Sibling-Lock-Sprache benötigt nach diesem Stand nur `ecosystems.yml`, Tests/Demos und den pre-commit-Dateiglob — kein `package/<lang>.sh` und keine Allowlist-, Label- oder Coverage-Anpassung in Bash. Overlay-Klassen wie Python oder JavaScript, Schema-Entscheidungen und Hook-Globs bleiben eigene Erweiterungspfade.
 
 ---
 
