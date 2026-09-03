@@ -22,7 +22,7 @@ jobs:
 
   # ── Dogfood these checks on this repo ─────────────────────────────────────
   self-cicd-sec-04-poisoned-pipeline:
-    name: 'Self-Check: 🧩 Code | 🚨 04-poisoned-pipeline — Poisoned pipeline'
+    name: 04-poisoned-pipeline
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,7 +31,7 @@ jobs:
       - run: bash scripts/checks/domain/cicd_sec_04_poisoned_pipeline.sh .
 
   self-cicd-sec-08-action-pinning:
-    name: 'Self-Check: 🧩 Code | 📌 08-action-pinning — Action SHA pinning'
+    name: 08-action-pinning
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,7 +40,7 @@ jobs:
       - run: bash scripts/checks/domain/cicd_sec_08_action_pinning.sh .
 
   self-cicd-sec-05-permissions:
-    name: 'Self-Check: 🧩 Code | 🔐 05-permissions — Workflow permissions'
+    name: 05-permissions
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,7 +49,7 @@ jobs:
       - run: bash scripts/checks/domain/cicd_sec_05_permissions.sh .
 
   self-cicd-sec-03-dependency-chain:
-    name: 'Self-Check: 🧩 Code | 🔒 03-dependency-chain — Dependency chain'
+    name: 03-dependency-chain
     runs-on: ubuntu-latest
     permissions:
       contents: read

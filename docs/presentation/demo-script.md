@@ -46,7 +46,7 @@ Ein Durchlauf reicht live. SEC-04 auf well soll durchlaufen; SEC-03 auf errors s
 
 Zeigen, nicht debuggen:
 
-- [well `security.yml`](https://github.com/GRAYOAK/cicd-guardrails-demo-well/blob/main/.github/workflows/security.yml): `uses: GRAYOAK/cicd-guardrails/.github/workflows/full-scan.yml@9802b5afffeb9e9097a2c73eae480ed62eab76be` plus `guardrails-repository` / `guardrails-ref` (gleiche SHA).
+- [well `security.yml`](https://github.com/GRAYOAK/cicd-guardrails-demo-well/blob/main/.github/workflows/security.yml): kurzer Caller-Job-Name `scan`; `uses: GRAYOAK/cicd-guardrails/.github/workflows/full-scan.yml@9802b5afffeb9e9097a2c73eae480ed62eab76be` plus `guardrails-repository` / `guardrails-ref` (gleiche SHA).
 - [errors `security.yml`](https://github.com/GRAYOAK/cicd-guardrails-demo-errors/blob/main/.github/workflows/security.yml): gleiches Pin-Muster; errors hat zusätzlich `generate-token` / `admin-token`.
 - `.pre-commit-config.yaml`: `rev` **gleich** der `uses`-SHA.
 
@@ -88,4 +88,4 @@ Nicht als eigener Folienblock; nur sagen, wenn es hakt oder jemand nachfragt.
 
 **Hook-IDs.** Producer: slug-IDs (`cicd-sec-04-poisoned-pipeline`, …). Demo-`main` kann Legacy-IDs (`cicd-sec-04`, …) haben. Parität gilt für die SHA.
 
-**#22.** Lange Display-Namen in der GitHub-UI können abschneiden — Ampel gelb, Demo trotzdem.
+**#22.** Called-Jobs heißen kurz `setup`, `risk-summary`, `01-flow` … `08-action-pinning`; Consumer nutzen `jobs.guardrails.name: scan` oder lassen `name:` weg. Ampel bis Merge und Consumer-Migration gelb.

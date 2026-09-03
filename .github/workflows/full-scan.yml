@@ -54,7 +54,7 @@ jobs:
 
   # ── Setup: validate caller-supplied guardrails pin (required for cross-repo calls) ─
   setup:
-    name: 'Setup'
+    name: setup
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -80,7 +80,7 @@ jobs:
 
   # ── Result aggregation ────────────────────────────────────────────────────
   summarize:
-    name: '📊 Risk summary'
+    name: risk-summary
     needs:
       - setup
       - cicd-sec-04-poisoned-pipeline
@@ -127,7 +127,7 @@ jobs:
 
   # ── CICD-SEC-04-POISONED-PIPELINE: pull_request_target ───────────────────
   cicd-sec-04-poisoned-pipeline:
-    name: '🧩 Code | 🚨 04-poisoned-pipeline — Poisoned pipeline'
+    name: 04-poisoned-pipeline
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-04-poisoned-pipeline') && !contains(inputs.skip-checks, 'cicd-sec-04') }}
     runs-on: ubuntu-latest
@@ -167,7 +167,7 @@ jobs:
   # under .github/workflows is covered by CICD-SEC-03-DEPENDENCY-CHAIN to avoid duplicate findings.
   # ── CICD-SEC-08-ACTION-PINNING: Action SHA-Pinning (composite actions) ──────
   cicd-sec-08-action-pinning:
-    name: '🧩 Code | 📌 08-action-pinning — Action SHA pinning'
+    name: 08-action-pinning
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-08-action-pinning') && !contains(inputs.skip-checks, 'cicd-sec-08') }}
     runs-on: ubuntu-latest
@@ -203,7 +203,7 @@ jobs:
 
   # ── CICD-SEC-05-PERMISSIONS: Workflow permissions ─────────────────────────
   cicd-sec-05-permissions:
-    name: '🧩 Code | 🔐 05-permissions — Workflow permissions'
+    name: 05-permissions
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-05-permissions') }}
     runs-on: ubuntu-latest
@@ -239,7 +239,7 @@ jobs:
 
   # ── CICD-SEC-03-DEPENDENCY-CHAIN: Dependency chain ────────────────────────
   cicd-sec-03-dependency-chain:
-    name: '🧩 Code | 🔒 03-dependency-chain — Dependency chain'
+    name: 03-dependency-chain
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-03-dependency-chain') && !contains(inputs.skip-checks, 'cicd-sec-03') }}
     runs-on: ubuntu-latest
@@ -275,7 +275,7 @@ jobs:
 
   # ── CICD-SEC-06-SECRET-SCAN: Secret scanning ──────────────────────────────
   cicd-sec-06-secret-scan:
-    name: '🧩 Code | 🕵️ 06-secret-scan — Secret scanning'
+    name: 06-secret-scan
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-06-secret-scan') && !contains(inputs.skip-checks, 'cicd-sec-06') }}
     runs-on: ubuntu-latest
@@ -314,7 +314,7 @@ jobs:
 
   # ── CICD-SEC-01-FLOW: Flow control ────────────────────────────────────────
   cicd-sec-01-flow:
-    name: '⚙️ Settings | 🧭 01-flow — Flow control'
+    name: 01-flow
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-01-flow') }}
     runs-on: ubuntu-latest
@@ -351,7 +351,7 @@ jobs:
 
   # ── CICD-SEC-05-BRANCH: Branch governance and PBAC ────────────────────────
   cicd-sec-05-branch:
-    name: '⚙️ Settings | 🛂 05-branch — Branch governance'
+    name: 05-branch
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-05-branch') }}
     runs-on: ubuntu-latest
@@ -388,7 +388,7 @@ jobs:
 
   # ── CICD-SEC-05-RUNNER-ACCESS: Runner access policy ───────────────────────
   cicd-sec-05-runner-access:
-    name: '🧩 Code | 🖥️ 05-runner-access — Runner access'
+    name: 05-runner-access
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-05-runner-access') }}
     runs-on: ubuntu-latest
@@ -424,7 +424,7 @@ jobs:
 
   # ── CICD-SEC-07-RUNNER-HARDENING: Runner hardening ────────────────────────
   cicd-sec-07-runner-hardening:
-    name: '🧩 Code | 🧱 07-runner-hardening — Runner hardening'
+    name: 07-runner-hardening
     needs: setup
     if: ${{ !contains(inputs.skip-checks, 'cicd-sec-07-runner-hardening') }}
     runs-on: ubuntu-latest
