@@ -91,6 +91,7 @@ permissions:
 
 jobs:
   guardrails:
+    name: scan
     uses: YOUR_ORG/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
     with:
       strict: true
@@ -110,7 +111,7 @@ Vollständiges Setup (GitHub App, Branch Protection, `skip-checks`, `.guardrails
 
 ## Was wird geprüft?
 
-Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designation. Die **Display-Namen** der Jobs nutzen zwei visuelle Marker: ein Emoji für **Code** vs **Settings**, dann der Text `Code |` bzw. `Settings |`, dann ein **Themen-Emoji** und Kurz-ID mit Titel.
+Skripte, Workflow-Job-IDs und `FB_CHECK_ID` folgen einheitlich der OWASP-Designation. Die **Display-Namen** der Jobs sind kurze, eindeutige Purpose-Slugs wie `01-flow` und `08-action-pinning`, damit der identifizierende Teil in der GitHub-PR-Ansicht sichtbar bleibt. Code- und Settings-Scope bleiben in der Tabelle und im Risk Summary erhalten.
 
 | Designation | Job-ID | Skript | Scope | Was wird erkannt |
 |---|---|---|---|---|
@@ -132,7 +133,7 @@ Die pro Job geschriebenen JSON-Ergebnisdateien enthalten zusätzlich **`scan_cov
 
 Während eines Jobs erscheinen grobe Phasen im Log (kein Log je Datei): auf GitHub Actions als Notice (`::notice::<Designation> phase: <name>`), lokal auf stderr. Alle Checks loggen `start`; schwere Checks (vor allem SEC-03-DEPENDENCY-CHAIN und SEC-06-SECRET-SCAN) fügen wenige weitere Phasen hinzu.
 
-> **Migrationshinweis (Breaking Change):** Job-IDs und `skip-checks`-Tokens bleiben `cicd-sec-*`. **Display-Namen** (Scope-Emoji 🧩/⚙️, `Code |` / `Settings |`, Themen-Emoji, Text) müssen in Branch Protection exakt gematcht werden. Nach einem Workflow-Pin-Update ggf. Required-Checks anpassen. Mapping siehe Abschnitt [Branch Protection konfigurieren](#branch-protection-konfigurieren-prs-blockieren).
+> **Migrationshinweis (Breaking Change):** Job-IDs und `skip-checks`-Tokens bleiben `cicd-sec-*`. Nur die **Display-Namen** werden auf kurze Purpose-Slugs umgestellt. Nach einem Workflow-Pin-Update müssen Required-Checks angepasst werden. Mapping und Consumer-Aktionen stehen in `migrations/.unreleased/short-check-display-names.md`.
 
 ---
 
@@ -173,6 +174,7 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
   guardrails:
+    name: scan
     needs: generate-token
     uses: YOUR_ORG/cicd-guardrails/.github/workflows/full-scan.yml@<SHA>
     with:
@@ -189,17 +191,19 @@ GitHub → Repo Settings → Branches → Add rule → `main`:
 
 - ✅ Require status checks to pass before merging
 - ✅ Require branches to be up to date before merging
-- Required status checks (Display-Namen exakt so eintragen):
-  - `🧩 Code | 🚨 04-poisoned-pipeline — Poisoned pipeline`
-  - `🧩 Code | 📌 08-action-pinning — Action SHA pinning`
-  - `🧩 Code | 🔐 05-permissions — Workflow permissions`
-  - `🧩 Code | 🔒 03-dependency-chain — Dependency chain`
-  - `🧩 Code | 🕵️ 06-secret-scan — Secret scanning`
-  - `🧩 Code | 🖥️ 05-runner-access — Runner access`
-  - `🧩 Code | 🧱 07-runner-hardening — Runner hardening`
-  - `⚙️ Settings | 🧭 01-flow — Flow control` ← nur mit Admin-Token sinnvoll
-  - `⚙️ Settings | 🛂 05-branch — Branch governance` ← nur mit Admin-Token sinnvoll
+- Required status checks bei `jobs.guardrails.name: scan` (exakt so auswählen):
+  - `scan / 04-poisoned-pipeline`
+  - `scan / 08-action-pinning`
+  - `scan / 05-permissions`
+  - `scan / 03-dependency-chain`
+  - `scan / 06-secret-scan`
+  - `scan / 05-runner-access`
+  - `scan / 07-runner-hardening`
+  - `scan / 01-flow` ← nur mit Admin-Token sinnvoll
+  - `scan / 05-branch` ← nur mit Admin-Token sinnvoll
 - ✅ Do not allow bypassing the above settings
+
+GitHub setzt die PR-Anzeige aus Workflow-Name, Caller-Job-Name und Called-Job-Name zusammen. Deshalb den Caller-Job kurz als `scan` benennen oder `name:` weglassen; ohne `name:` wird dessen Job-ID (hier `guardrails`) verwendet. Required-Checks müssen zum tatsächlich gewählten Caller-Job-Namen passen.
 
 ### Migrationsmodus für bestehende Repos
 
@@ -220,7 +224,7 @@ jobs:
 
 ### Risiko-Kontext über `.guardrails.yml` steuern
 
-Der finale Job `📊 Risk summary` liest optional eine Datei `.guardrails.yml` im Ziel-Repo
+Der finale Job `risk-summary` liest optional eine Datei `.guardrails.yml` im Ziel-Repo
 und gewichtet Findings kontextabhängig.
 
 Referenzen im Root dieses Repos:
@@ -366,7 +370,7 @@ checks:
 
 ### Final Summary lesen
 
-Die finale Ausgabe im Job `📊 Risk summary` ist auf schnelle Priorisierung optimiert:
+Die finale Ausgabe im Job `risk-summary` ist auf schnelle Priorisierung optimiert:
 
 - Executive Snapshot mit Anzahl `Critical | High | Medium`
 - Hinweis, wenn Checks per `mode: warn|off` deeskaliert wurden

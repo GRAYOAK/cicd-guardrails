@@ -32,13 +32,13 @@ Ampel: **grün** = auf `origin/dev` (`dc65e0b`); **gelb** = offene Issues oder b
 | JS/TS-Policy SEC-03 | **Grün** | [PR #11](https://github.com/GRAYOAK/cicd-guardrails/pull/11) (`c1ce141`) |
 | Full-Scan-Performance | **Grün** | [PR #12](https://github.com/GRAYOAK/cicd-guardrails/pull/12) (`54d8816`) |
 | SEC-03-Engine (Inventur, Toggles, YAML + Named Validators, Dart) | **Grün** | [#14](https://github.com/GRAYOAK/cicd-guardrails/issues/14)/[#19](https://github.com/GRAYOAK/cicd-guardrails/pull/19), [#16](https://github.com/GRAYOAK/cicd-guardrails/issues/16)/[#20](https://github.com/GRAYOAK/cicd-guardrails/pull/20), [#15](https://github.com/GRAYOAK/cicd-guardrails/issues/15)+[#17](https://github.com/GRAYOAK/cicd-guardrails/issues/17)/[#21](https://github.com/GRAYOAK/cicd-guardrails/pull/21), [#18](https://github.com/GRAYOAK/cicd-guardrails/issues/18)/[#25](https://github.com/GRAYOAK/cicd-guardrails/pull/25) (`9802b5a`) |
-| CI reusable `full-scan.yml` | **Grün** | Jobs inkl. `📊 Risk summary`; Inputs `guardrails-repository` / `guardrails-ref` (40-Zeichen-SHA, **required**) |
+| CI reusable `full-scan.yml` | **Grün** | Kurze Job-Namen inkl. `risk-summary`; Inputs `guardrails-repository` / `guardrails-ref` (40-Zeichen-SHA, **required**) |
 | pre-commit | **Grün** | Producer-Hook-IDs: `cicd-sec-04-poisoned-pipeline`, `cicd-sec-08-action-pinning`, `cicd-sec-05-permissions`, `cicd-sec-05-runner-access`, `cicd-sec-07-runner-hardening`, `cicd-sec-03-dependency-chain`, `cicd-sec-06-secret-scan` (`stages: [manual]`) |
 | Lokal | **Grün** | `bash scripts/checks/domain/cicd_sec_*.sh <repo-root>` |
 | Demos well / errors | **Grün** | [#10](https://github.com/GRAYOAK/cicd-guardrails/issues/10) zu, Producer [#26](https://github.com/GRAYOAK/cicd-guardrails/pull/26); [`cicd-guardrails-demo-well`](https://github.com/GRAYOAK/cicd-guardrails-demo-well), [`cicd-guardrails-demo-errors`](https://github.com/GRAYOAK/cicd-guardrails-demo-errors); `task test:demos` |
 | Config `.guardrails.yml` | **Grün** | Context, `checks.*.mode`, SEC-03 `ecosystems` |
 | Epic Engine Follow-ups | **Gelb** | [#13](https://github.com/GRAYOAK/cicd-guardrails/issues/13) offen; Proof auf `dev`; Rest [#23](https://github.com/GRAYOAK/cicd-guardrails/issues/23) (Dart-Lock-Heuristik), [#24](https://github.com/GRAYOAK/cicd-guardrails/issues/24) (Allowlist/Coverage aus YAML) |
-| Check-Namen in GitHub-UI | **Gelb** | [#22](https://github.com/GRAYOAK/cicd-guardrails/issues/22) (lange Display-Namen, Truncation) |
+| Check-Namen in GitHub-UI | **Gelb** | [#22](https://github.com/GRAYOAK/cicd-guardrails/issues/22): kurze Called-Job-Namen (`01-flow` … `08-action-pinning`) vorbereitet; bleibt gelb bis Merge und Consumer-Migration |
 | Demo well FLOW/BRANCH in CI | **Gelb** | well `main` ohne `admin-token`; Token-Verdrahtung = well [PR #2](https://github.com/GRAYOAK/cicd-guardrails-demo-well/pull/2) (Secrets/Protection, **nicht** dieses Doc) |
 
 Demo-Pin auf well/errors `main` (Stand dieses Snapshots): `9802b5afffeb9e9097a2c73eae480ed62eab76be` (`9802b5a`). Das ist **nicht** `dev`-HEAD (`dc65e0b`, Harness/Docs). Für Check-Verhalten den **Demo-Pin** nutzen; für „was ist das Produkt“ `origin/dev`.
@@ -91,6 +91,7 @@ with:
 **Laufende Caller-Wahrheit** (Demos auf `main`): `full-scan.yml` auf `dev` verlangt **required** `guardrails-repository` und `guardrails-ref` (40-Zeichen-SHA). Siehe [migrations/v0.3.2.md](../../migrations/v0.3.2.md) und [demo-well `security.yml`](https://github.com/GRAYOAK/cicd-guardrails-demo-well/blob/main/.github/workflows/security.yml):
 
 ```yaml
+name: scan
 uses: GRAYOAK/cicd-guardrails/.github/workflows/full-scan.yml@9802b5afffeb9e9097a2c73eae480ed62eab76be
 with:
   guardrails-repository: GRAYOAK/cicd-guardrails
@@ -113,7 +114,7 @@ task test:demos    # bash tests/test_demo_repos.sh
 
 Geschwisterpfade `../cicd-guardrails-demo-well` und `../cicd-guardrails-demo-errors`, Override `GUARDRAILS_DEMO_WELL_PATH` / `GUARDRAILS_DEMO_ERRORS_PATH`. Der Harness **skippt** FLOW/BRANCH. well: file-based Exit **0**; errors insgesamt **≠ 0** (SEC-03 reicht). Exit **2** = Infra (`yq`/`gitleaks`/`jq`), kein erwartetes errors-Rot. **Nicht** Required-Check auf Producer-PRs.
 
-Branch Protection Display-Namen (exakt README), z. B. `🧩 Code | 🚨 04-poisoned-pipeline — Poisoned pipeline`, `⚙️ Settings | 🧭 01-flow — Flow control` (FLOW/BRANCH nur mit Admin-Token sinnvoll).
+Branch Protection Required-Checks (exakt README), z. B. `scan / 04-poisoned-pipeline` und `scan / 01-flow` (FLOW/BRANCH nur mit Admin-Token sinnvoll).
 
 ---
 
