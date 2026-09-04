@@ -50,7 +50,16 @@ fp_init "$PATH_ROOT"
 pp_init "$PATH_ROOT"
 trap pp_cleanup EXIT
 
-fb_add_searched "Inventory-gated package policies (Python, JavaScript/TypeScript/Bun, Dart, Go, Rust, Ruby, PHP)"
+SEC03_SEARCHED_LABELS="$(
+  {
+    printf '%s\n' "Python"
+    while IFS= read -r ecosystem; do
+      [[ -n "$ecosystem" ]] && ecosystem_policy_label "$ecosystem"
+      printf '\n'
+    done < <(ecosystem_policy_ids)
+  } | awk 'NF { if (seen++) printf ", "; printf "%s", $0 } END { print "" }'
+)"
+fb_add_searched "Inventory-gated package policies (${SEC03_SEARCHED_LABELS})"
 fb_add_searched "Unsupported dependency signals (Maven, Gradle, NuGet, Deno, Pipenv, Conda)"
 fb_add_searched "GitHub workflow YAML files for third-party action SHA pins"
 fb_add_searched "Dockerfiles for digest-pinned base images"
@@ -70,6 +79,7 @@ sec03_inventory_name_union() {
     [[ -z "$ecosystem" ]] && continue
     ecosystem_policy_detect_names "$ecosystem"
     ecosystem_policy_file_names "$ecosystem"
+    ecosystem_policy_required_sibling_names "$ecosystem"
   done < <(ecosystem_policy_ids)
   printf '%s\n' \
     "pom.xml" "build.gradle" "build.gradle.kts" "*.csproj" "*.fsproj" "packages.lock.json" \
@@ -219,15 +229,7 @@ sec03_ecosystem_detect_names() {
 }
 
 sec03_ecosystem_label() {
-  case "$1" in
-    javascript) printf '%s' "JavaScript/TypeScript" ;;
-    dart) printf '%s' "Dart" ;;
-    go) printf '%s' "Go" ;;
-    rust) printf '%s' "Rust" ;;
-    ruby) printf '%s' "Ruby" ;;
-    php) printf '%s' "PHP" ;;
-    *) printf '%s' "$1" ;;
-  esac
+  ecosystem_policy_label "$1"
 }
 
 sec03_phase_manifests_and_requirements() {
@@ -282,12 +284,13 @@ sec03_phase_unsupported_ecosystems() {
 }
 
 sec03_report_config_notices() {
-  local ecosystem_id invalid_entry invalid_id invalid_value
+  local ecosystem_id invalid_entry invalid_id invalid_value allowed_ids
+  allowed_ids="$(cfg_sec03_ecosystem_ids | awk 'NF { if (seen++) printf ", "; printf "%s", $0 }')"
 
   while IFS= read -r ecosystem_id; do
     [[ -z "$ecosystem_id" ]] && continue
     fb_report "notice" "Unknown SEC-03 ecosystem key '${ecosystem_id}'; ignoring it." \
-      ".guardrails.yml" "" "Use one of: javascript, python, dart, go, rust, ruby, php." "configuration"
+      ".guardrails.yml" "" "Use one of: ${allowed_ids}." "configuration"
   done < <(cfg_sec03_unknown_ecosystem_keys)
 
   while IFS= read -r invalid_entry; do
@@ -297,6 +300,36 @@ sec03_report_config_notices() {
     fb_report "notice" "Invalid SEC-03 ecosystem mode '${invalid_value}' for '${invalid_id}'; using default 'fail'." \
       ".guardrails.yml" "" "Set the ecosystem mode to 'fail' or 'off'." "configuration"
   done < <(cfg_sec03_invalid_ecosystem_values)
+}
+
+sec03_coverage_records() {
+  local ecosystem name phase
+  local -A manifest_names=()
+
+  while IFS= read -r name; do
+    [[ -n "$name" ]] && manifest_names["$name"]=1
+  done < <(
+    pp_python_trigger_names
+    while IFS= read -r ecosystem; do
+      [[ -n "$ecosystem" ]] && ecosystem_policy_detect_names "$ecosystem"
+    done < <(ecosystem_policy_ids)
+  )
+
+  {
+    pp_python_trigger_names
+    pp_python_satisfier_names
+    while IFS= read -r ecosystem; do
+      [[ -z "$ecosystem" ]] && continue
+      ecosystem_policy_detect_names "$ecosystem"
+      ecosystem_policy_file_names "$ecosystem"
+      ecosystem_policy_required_sibling_names "$ecosystem"
+    done < <(ecosystem_policy_ids)
+  } | sort -u | while IFS= read -r name; do
+    [[ -z "$name" ]] && continue
+    phase="Lock"
+    [[ -n "${manifest_names[$name]+set}" ]] && phase="Manifest"
+    printf '%s|%s\n' "$phase" "$name"
+  done
 }
 
 sec03_phase_workflows_and_dockerfiles() {
@@ -337,17 +370,11 @@ sec03_phase_unsupported_ecosystems
 sec03_phase_workflows_and_dockerfiles
 
 fb_phase "summary"
-for sec03_name in package.json pubspec.yaml go.mod Cargo.toml Gemfile composer.json package-lock.json yarn.lock pnpm-lock.yaml bun.lockb pubspec.lock go.sum Cargo.lock Gemfile.lock composer.lock; do
+while IFS='|' read -r sec03_phase sec03_name; do
+  [[ -n "$sec03_name" ]] || continue
   mapfile -t sec03_files < <(sec03_inventory_paths "$sec03_name")
-  case "$sec03_name" in
-    package.json|pubspec.yaml|go.mod|Cargo.toml|Gemfile|composer.json)
-      sec03__coverage_inventory "Manifest" "$sec03_name" "${sec03_files[@]+"${sec03_files[@]}"}"
-      ;;
-    *)
-      sec03__coverage_inventory "Lock" "$sec03_name" "${sec03_files[@]+"${sec03_files[@]}"}"
-      ;;
-  esac
-done
+  sec03__coverage_inventory "$sec03_phase" "$sec03_name" "${sec03_files[@]+"${sec03_files[@]}"}"
+done < <(sec03_coverage_records)
 sec03__coverage_workflows_and_dockerfiles
 
 fb_auto_status "$STRICT_MODE"

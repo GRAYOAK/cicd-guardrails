@@ -689,7 +689,11 @@ environment:
 EOF
 printf 'packages:\n' >"$TMP/services/dart-app/pubspec.lock"
 run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
-assert_exit "passes when pubspec.yaml has a nonempty same-directory pubspec.lock" 0 "$LAST_EXIT"
+assert_exit "passes when pubspec.lock contains the packages marker" 0 "$LAST_EXIT"
+printf '# TODO\n' >"$TMP/services/dart-app/pubspec.lock"
+run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
+assert_exit "fails when nonempty pubspec.lock lacks packages marker" 1 "$LAST_EXIT"
+assert_output_contains "reports missing Dart packages section" "pubspec.lock is missing the packages section."
 printf '' >"$TMP/services/dart-app/pubspec.lock"
 run_check "$DOMAIN_DIR/cicd_sec_03_dependency_chain.sh" "$TMP"
 assert_exit "fails when pubspec.lock is empty" 1 "$LAST_EXIT"
@@ -1178,6 +1182,35 @@ EOF
   teardown
 
   echo ""
+  echo "▶ SEC-03 allowlist ignores IDs from test-local ecosystem YAML"
+  setup
+  cat >"$TMP/ecosystems.yml" <<'EOF'
+ecosystems:
+  test_local:
+    label: Test Local
+    detect:
+      any_files: [manifest.test]
+EOF
+  cat >"$TMP/.guardrails.yml" <<'EOF'
+checks:
+  CICD-SEC-03-DEPENDENCY-CHAIN:
+    ecosystems:
+      test_local: off
+EOF
+  cat >"$TMP/check-shipped-allowlist.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "${SCRIPTS_DIR}/lib/config.sh"
+cfg_init "\$1"
+ECOSYSTEM_POLICY_CONFIG="\$2"
+cfg_sec03_unknown_ecosystem_keys
+EOF
+  run_check "$TMP/check-shipped-allowlist.sh" "$TMP" "$TMP/ecosystems.yml"
+  assert_exit "test-local ecosystem allowlist probe succeeds" 0 "$LAST_EXIT"
+  assert_output_contains "test-local ecosystem remains unknown" "test_local"
+  teardown
+
+  echo ""
   echo "▶ SEC-03 defaults invalid known ecosystem values to fail"
   setup
   printf 'module example.com/invalid-go\n\ngo 1.22\n' >"$TMP/go.mod"
@@ -1352,6 +1385,7 @@ for item in json.load(sys.stdin):
   ECOSYSTEMS_YML="${ROOT_DIR}/scripts/config/ecosystems.yml"
   EXPECTED_GO_ECOSYSTEM="$(mktemp)"
   cat >"$EXPECTED_GO_ECOSYSTEM" <<'EOF'
+label: Go
 detect:
   any_files: [go.mod]
 files:

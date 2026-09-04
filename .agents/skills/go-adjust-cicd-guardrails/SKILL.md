@@ -108,13 +108,16 @@ Renaming **workflow job IDs** or **`FB_CHECK_ID`** is a breaking change for `ski
 
 ### Add a SEC-03 language policy
 
-1. Add detection and file rules to `scripts/config/ecosystems.yml`; prefer existing YAML primitives such as `require_sibling` and `not_empty` when they express the policy.
-2. Add the public ecosystem ID to the hardcoded allowlist and invalid-value loop in `scripts/lib/config.sh`; do not derive the allowlist from YAML.
-3. Add the ecosystem gate to `.guardrails.schema.json`, `.guardrails.example.yml`, and `reference-risk-model.md`.
-4. Wire the public label, searched text, config remediation, and manifest/lock coverage names in `cicd_sec_03_dependency_chain.sh` without adding a second repository walk.
-5. Extend `.pre-commit-hooks.yaml` so manifest and lockfile changes trigger SEC-03.
-6. Test compliant, missing-lock, empty-lock, orphan-lock, and `off` cases in `tests/test_checks.sh`, including skip visibility from an unrelated language fixture.
-7. Update README, `.guardrails.file-patterns.reference.yml`, the sibling-lock playbook, and consumer/demo migration guidance.
+For a Dart-like sibling-lock ecosystem:
+
+1. Add `label`, detection, and file rules to `scripts/config/ecosystems.yml`; prefer existing YAML primitives such as `require_sibling`, `not_empty`, and a stable `contains` marker.
+2. Extend `.pre-commit-hooks.yaml` so manifest and lockfile changes trigger SEC-03.
+3. Test compliant, missing-lock, empty/invalid-lock, orphan-lock, and `off` cases in `tests/test_checks.sh`, including skip visibility from an unrelated language fixture.
+4. Update tests/demos, README, `.guardrails.file-patterns.reference.yml`, the sibling-lock playbook, and consumer migration guidance.
+
+Do not add `package/<lang>.sh` or edit Bash allowlists, labels, searched text, or coverage filename loops: these are derived from the shipped `ecosystems.yml`. Test-local or consumer YAML must not enlarge the public allowlist.
+
+For an overlay-class ecosystem such as Python or JavaScript, treat the merged defaults, trigger/satisfier helpers, named validators, and overlay semantics as a separate design path. Schema policy and pre-commit hook globs are also explicit integration paths rather than runtime language-engine derivation.
 
 ### Release, changelog, and migrations (mandatory)
 

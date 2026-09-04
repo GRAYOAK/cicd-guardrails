@@ -2,6 +2,7 @@
 
 ecosystems:
   dart:
+    label: Dart
     detect:
       any_files: [pubspec.yaml]
     files:
@@ -15,7 +16,11 @@ ecosystems:
           - not_empty: true
             message: "pubspec.lock is empty."
             remediation: "Run dart pub get or flutter pub get and commit pubspec.lock."
+          - contains: "packages:"
+            message: "pubspec.lock is missing the packages section."
+            remediation: "Run dart pub get or flutter pub get and commit pubspec.lock."
   go:
+    label: Go
     detect:
       any_files: [go.mod]
     files:
@@ -30,6 +35,7 @@ ecosystems:
             message: "go.sum is empty."
             remediation: "Run go mod tidy and commit go.sum."
   rust:
+    label: Rust
     detect:
       any_files: [Cargo.toml]
     files:
@@ -48,6 +54,7 @@ ecosystems:
             message: "Cargo.lock appears invalid."
             remediation: "Run cargo generate-lockfile and commit Cargo.lock."
   ruby:
+    label: Ruby
     detect:
       any_files: [Gemfile]
     files:
@@ -62,6 +69,7 @@ ecosystems:
             message: "Gemfile.lock is empty."
             remediation: "Run bundle install and commit Gemfile.lock."
   php:
+    label: PHP
     detect:
       any_files: [composer.json]
     files:
@@ -80,6 +88,7 @@ ecosystems:
             message: "composer.lock missing packages section (invalid lockfile)."
             remediation: "Run composer install and commit composer.lock."
   javascript:
+    label: JavaScript/TypeScript
     detect:
       any_files: [package.json, tsconfig.json, jsconfig.json]
     files:

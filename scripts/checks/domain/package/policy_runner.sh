@@ -16,6 +16,30 @@ ecosystem_policy_ids() {
   ' "$ECOSYSTEM_POLICY_CONFIG"
 }
 
+ecosystem_policy_label() {
+  local ecosystem="$1"
+  local label
+  label="$(
+    awk -v ecosystem="$ecosystem" '
+      $0 == "  " ecosystem ":" { in_ecosystem = 1; next }
+      in_ecosystem && /^  [^ ]+:/ { exit }
+      in_ecosystem && /^    label: / {
+        value = $0
+        sub(/^    label: /, "", value)
+        gsub(/^["'\'']|["'\'']$/, "", value)
+        print value
+        exit
+      }
+    ' "$ECOSYSTEM_POLICY_CONFIG"
+  )"
+  if [[ -n "$label" ]]; then
+    printf '%s' "$label"
+  else
+    label="${ecosystem//[-_]/ }"
+    printf '%s' "${label^}"
+  fi
+}
+
 ecosystem_policy_detect_names() {
   local ecosystem="$1"
   awk -v ecosystem="$ecosystem" '
@@ -48,6 +72,21 @@ ecosystem_policy_file_names() {
       print value
     }
   ' "$ECOSYSTEM_POLICY_CONFIG"
+}
+
+ecosystem_policy_required_sibling_names() {
+  local ecosystem="$1"
+  local file rule argument minimum_bytes message remediation sibling
+  local -a siblings=()
+  while IFS='|' read -r file rule argument minimum_bytes message remediation; do
+    [[ "$rule" == "require_sibling" ]] || continue
+    IFS=',' read -ra siblings <<<"$argument"
+    for sibling in "${siblings[@]}"; do
+      sibling="${sibling#"${sibling%%[![:space:]]*}"}"
+      sibling="${sibling%"${sibling##*[![:space:]]}"}"
+      [[ -n "$sibling" ]] && printf '%s\n' "$sibling"
+    done
+  done < <(ecosystem_policy_rule_records "$ecosystem")
 }
 
 # Emits: file name, rule type, rule argument, minimum bytes, message, remediation.
